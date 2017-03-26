@@ -53,8 +53,8 @@ sys.path.append('/home/pi/Navio2/Python/navio')
 import mpu9250
 import Complementary_Filter2
 import ControlSurface_Calibration
-import Controls_LowLevel
-import Controls_MidLevel
+import Control_LowLevel
+import Control_MidLevel
 import PID
 import rcinput
 import pwm
@@ -205,8 +205,8 @@ if (mode==1 or mode==4):
                           
     # Initialize controllers
     CsCal=ControlSurface_Calibration.CS_cal()
-    LowLevel=Controls_LowLevel.LL_controls()
-    MidLevel=Controls_MidLevel.ML_controls()
+    LowLevel=Control_LowLevel.LL_controls()
+    MidLevel=Control_MidLevel.ML_controls()
                           
     time.sleep(3)
 
