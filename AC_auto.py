@@ -53,8 +53,9 @@ sys.path.append('/home/pi/Navio2/Python/navio')
 import mpu9250
 import Complementary_Filter2
 import ControlSurface_Calibration
-import Control_LowLevel
-import Control_MidLevel
+import Controls_LowLevel
+import Controls_MidLevel
+import read_preprogrammed_maneuver
 import PID
 import rcinput
 import pwm
@@ -70,10 +71,14 @@ tgear=0
 gearflag=0
 
 ## VARIABLE DEFINITIONS ##
-hix=-13.696
-hiy=34.376
-hiz=-10.118
-
+hix=-13.696 #Hard iron offset, x (from calibration)
+hiy=34.376 #Hard iron offset, y (from calibration)
+hiz=-10.118 #Hard iron offset, z (from calibration)
+steady_state_time=1 #Number of seconds that the aircraft must be at the initial condition (only for IC_TYPE=2) before the preprogrammed maneuver starts
+loop_dt=0.04 #Autopilot loop frequency (sec)
+steady_state_pitch_range=1 #+/-deg that pitch should be from initial condition before maneuver can start
+steady_state_roll_range=1 #+/-deg that roll should be from initial condition before maneuver can start
+steady_state_vel_range=3 #+/-deg that velocity should be from initial condition before maneuver can start
 
 
 def AHRS_process(processEXIT,output_array):
@@ -87,6 +92,11 @@ def AHRS_process(processEXIT,output_array):
     # output_array[7]=hard iron offset y
     # output_array[8]=hard iron offset z
     # output_array[9]=magnetometer function check
+    # output_array[10]=roll orientation offset due to installation
+    # output_array[11]=pitch orientation offset due to installation
+    # output_array[13]=ax
+    # output_array[14]=ay
+    # output_array[15]=az
     
     print('Starting AHRS process.')
     
@@ -143,14 +153,17 @@ def AHRS_process(processEXIT,output_array):
         output_array[3]=psi_dot_d
         output_array[4]=phi_dot_d
         output_array[5]=theta_dot_d
-    
+        output_array[13]=ax
+        output_array[14]=ay
+        output_array[15]=az
+
     return None
 
 def check_CLI_inputs():
     #Modes:
-    # 1 = Normal operation mode
-    # 2 = Calibration mode, straight pass through from RCINPUT
-    # 3 = Normal operation mode with data logging
+    # 1 = Pass through
+    # 2 = Pass through with data logging
+    # 3 = Preprogrammed maneuver mode [with data logging]
 
     if len(sys.argv)==1:
         mode=1
@@ -159,15 +172,32 @@ def check_CLI_inputs():
         if sys.argv[1]=='1':
             mode=1
             print('Entering normal operation.')
+
         elif sys.argv[1]=='2':
             mode=2
-            print('Entering calibration mode.')
-        elif sys.argv[1]=='3':
-            mode=3
             print('Entering normal operation with data logging.')
+
+        elif sys.argv[1]=='3':
+            if len(sys.argv)<3:
+                sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
+            mode=3
+            print('Entering maneuver mode.')
+        
+        elif sys.argv[1]=='-1':
+            mode=-1
+            print('Entering calibration mode.')
+
         else:
             sys.exit('Unknown input argument!')
     return mode
+
+def get_current_RCinputs():
+    # Definition is based of Assan X8R6 receiver
+    d_a_pwm=float(rcin.read(1)) #Aileron
+    d_e_pwm=float(rcin.read(2)) #Elevator
+    d_T_pwm=float(rcin.read(0)) #Throttle
+    d_r_pwm=float(rcin.read(3)) #Rudder
+    return d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm
 
 
 
@@ -191,11 +221,11 @@ rcou3.set_period(50)
 rcou4.set_period(50)
 
 # NORMAL OPERATION
-if (mode==1 or mode==4):
+if (mode>0):
 
     ## Subprocesses
     # Subprocess array for AHRS data
-    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0,0])
+    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0.0,0.0,0.0,0.0,0.0])
     # Subprocess value that sets exit flag
     process_EXIT=Value('i', 0)
     # Define the subprocesses
@@ -205,8 +235,8 @@ if (mode==1 or mode==4):
                           
     # Initialize controllers
     CsCal=ControlSurface_Calibration.CS_cal()
-    LowLevel=Control_LowLevel.LL_controls()
-    MidLevel=Control_MidLevel.ML_controls()
+    LowLevel=Controls_LowLevel.LL_controls()
+    MidLevel=Controls_MidLevel.ML_controls()
                           
     time.sleep(3)
 
@@ -218,11 +248,19 @@ if (mode==1 or mode==4):
         AHRS_proc.join()
         sys.exit('Magnetometer reading zero!')
 
-    # Setup up data log if mode=4
-    if mode==4:
+    # Setup up data log if mode calls for it
+    if mode!=1:
         print('Setting up flight log.')
         flt_log=open('flight_log.txt', 'w')
-        flt_log.write('t dt phi theta psi phi_dot theta_dot psi_dot elev ail thr rudd\n') #alt d_alt vel\n')
+        flt_log.write('t dt phi theta psi p q r ax ay az vel elev ail thr rudd phi_cmd theta_cmd psi_cmd vel_cmd\n')
+
+    if mode==3:
+        try:
+            PM=read_preprogrammed_maneuver.read_maneuver_file(sys.argv[2])
+            PM.read_file()
+        except:
+            sys.exit('Error processing maneuver file!')
+
 
     print('Initialization complete. Starting control loops...')    
     t_start=time.time()
@@ -230,6 +268,7 @@ if (mode==1 or mode==4):
     count=0 # Used for reduced frame rate output to screen
     auto_at_auto_flag=1
     led.setColor('Cyan')
+    dt3=0
 
     ##FOR DEBUG
     d_a=0
@@ -242,55 +281,129 @@ if (mode==1 or mode==4):
         # Check to see if mode is manual or auto
         gear_switch=float(rcin.read(4)) #Mode
     
-        # ---- Manual control mode
+        # ---- Pass through mode
         if gear_switch<=1500:
-            # Definition is based of Assan X8R6 receiver
             # Straight pass through
-            d_a_pwm=float(rcin.read(1)) #Aileron
-            d_e_pwm=float(rcin.read(2)) #Elevator
-            d_T_pwm=float(rcin.read(0)) #Throttle
-            d_r_pwm=float(rcin.read(3)) #Rudder
+            d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
             auto_at_auto_flag=1
         
         # ---- Automatic control mode
         elif gear_switch>1500:
+            #Get/set initial conditions when switching into auto mode
             if auto_at_auto_flag==1:
-                #Get the states when the autopilot was activated
-                phi_input_at_auto=AHRS_data[0] #roll
-                theta_input_at_auto=AHRS_data[1] #pitch
-                psi_input_at_auto=AHRS_data[2] #heading
-                #V_input_at_auto=V #velocity
-                #alt_input_at_auto=h #altitude
                 #Get current control surface commands
-                d_a_pwm=float(rcin.read(1)) #Aileron
-                d_e_pwm=float(rcin.read(2)) #Elevator
-                d_T_pwm=float(rcin.read(0)) #Throttle
-                d_r_pwm=float(rcin.read(3)) #Rudder
-                d_a_input_at_auto,d_e_input_at_auto,d_r_input_at_auto,d_T_input_at_auto=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
+                d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
+                #Convert control surface commands to angles
+                d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
+                
+                #If mode=3 (preprogrammed maneuver) set some variables
+                if mode==3:
+                    count_at_steady_state_pitch=0
+                    count_at_steady_state_roll=0
+                    count_at_steady_state_vel=0
+                    steady_state_condition_achieved_pitch=0
+                    steady_state_condition_achieved_roll=0
+                    steady_state_condition_achieved_vel=0
+                    man_flag=0
+                    maneuver_count=1
+                    if PM.ic_type==1:
+                        phi_cmd=AHRS_data[0] #roll
+                        theta_cmd=AHRS_data[1] #pitch
+                        psi_cmd=AHRS_data[2] #heading, not used ... just for reference
+                        #V_cmd=V #velocity
+                        #alt_cmd=h #altitude
+                    elif (PM.ic_type==3 or PM.ic_type==4):
+                        phi_cmd=PM.man_phi[0] #roll
+                        theta_cmd=PM.man_theta[0] #pitch
+                        psi_cmd=AHRS_data[2] #heading , not used ... just for reference
+                        if PM.ic_type==3:
+                            V_cmd=PM.man_vel[0]
+                        elif PM.ic_type==4:
+                            d_T_cmd=PM.man_thr[0]
+            
+                #If mode=1,2 save the current aircraft states
+                else:
+                    #Get the states when the autopilot was activated
+                    phi_cmd=AHRS_data[0] #roll
+                    theta_cmd=AHRS_data[1] #pitch
+                    psi_cmd=AHRS_data[2] #heading
+                    V_cmd=VELOCITY
                 
                 #Seed controllers
-                LowLevel.ail_PID.integral_term=d_a_input_at_auto
-                LowLevel.elev_PID.integral_term=d_e_input_at_auto
-                
+                LowLevel.ail_PID.integral_term=d_a_cmd
+                LowLevel.elev_PID.integral_term=d_e_cmd
+ 
                 #Change flag value (only needs to be one at moment controller is activated
                 auto_at_auto_flag=0
-                          
-            #MidLevel.controllers(psi_input_at_auto,AHRS_data[0],alt_input_at_auto,h_meas,V_input_at_auto,V_meas)
-            d_a,d_e,d_r=LowLevel.controllers(phi_input_at_auto,AHRS_data[0],theta_input_at_auto,AHRS_data[1],AHRS_data[3],0)
-            d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a,d_e,d_r,0) #Throttle hard coded to zero
-            d_T_pwm=float(rcin.read(0)) #Throttle
-        
+
+            if mode==3:
+                #Check to make sure that conditions are 'close' before activating maneuver
+                #If conditions are close, start maneuver
+                if (steady_state_condition_achieved_pitch==1 and steady_state_condition_achieved_roll==1 and steady_state_condition_achieved_vel==1):
+                    if man_flag==0:
+                        t_man_start=time.time()
+                        man_flag=1
+                    else:
+                        t_current=time.time()
+                        if (t_current-t_man_start)>=PM.man_time[maneuver_count] and man_flag<2:
+                            #If the current time is equal to (or just barely greater than) the maneuver time, change the target values
+                            phi_cmd=PM.man_phi[maneuver_count] #roll
+                            theta_cmd=PM.man_theta[maneuver_count] #pitch
+                            if PM.ic_type==3:
+                                V_cmd=PM.man_vel[maneuver_count] #velocity
+                            #Increment count to set next maneuver time
+                            maneuver_count+=1
+                            if maneuver_count>=len(PM.man_time):
+                                man_flag=2
+                        else:
+                            pass
+                
+                #If conditions aren't close, let the controller continue until the conditions are within the specified tolerances
+                else:
+                    #Check to make sure pitch angle is within +/- 'steady_state_pitch_range' for a certain amount of time before starting maneuver
+                    if abs(AHRS_data[1]-theta_cmd)<=steady_state_pitch_range and count_at_steady_state_pitch<(steady_state_time/loop_dt):
+                        count_at_steady_state_pitch+=1
+                    elif abs(AHRS_data[1]-theta_cmd)>1:
+                        count_at_steady_state_pitch=0
+                    else:
+                        steady_state_condition_achieved_pitch=1
+                    
+                    #Check to make sure roll angle is within +/- 'steady_state_roll_range' for a certain amount of time before starting maneuver
+                    if abs(AHRS_data[0]-phi_cmd)<steady_state_roll_range and count_at_steady_state_roll<(steady_state_time/loop_dt):
+                        count_at_steady_state_roll+=1
+                    elif abs(AHRS_data[0]-phi_cmd)>steady_state_roll_range:
+                        count_at_steady_state_roll=0
+                    else:
+                        steady_state_condition_achieved_roll=1
+                    
+                    #Check to make sure velocity is within +/- 'steady_state_vel_range' for a certain amount of time before starting maneuver
+                    if PM.ic_type==3:
+                        if abs(VELOCITY-V_cmd)<steady_state_vel_range and count_at_steady_state_vel<(steady_state_time/loop_dt):
+                            count_at_steady_state_vel+=1
+                        elif abs(VELOCITY-V_cmd)>steady_state_vel_range:
+                            count_at_steady_state_vel=0
+                        else:
+                            steady_state_condition_achieved_vel=1
+                    #Auto set flag when throttle is set as the initial condition
+                    elif PM.ic_type==4:
+                        steady_state_condition_achieved_vel=1
+
+
+            #MidLevel.controllers(psi_cmd,AHRS_data[0],alt_cmd,h_meas,V_cmd,V_meas)
+            d_a_cmd,d_e_cmd,d_r_cmd=LowLevel.controllers(phi_cmd,AHRS_data[0],theta_cmd,AHRS_data[1],AHRS_data[3],0)
+            d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd)
+            d_T_pwm=float(rcin.read(0)) ##Throttle hard coded to manual
+
         # Send servo commands to RCoutput --- CHECK THIS MAPPING
-        #rcou1.set_duty_cycle(d_T_pwm*0.001) # u_sec to m_sec
-        #rcou2.set_duty_cycle(d_a_pwm*0.001)
-        #rcou3.set_duty_cycle(d_e_pwm*0.001)
-        #rcou4.set_duty_cycle(d_r_pwm*0.001)
-        rcou1.set_duty_cycle(d_a_pwm*0.001) # u_sec to m_sec        
+        rcou1.set_duty_cycle(d_T_pwm*0.001) # u_sec to m_sec
+        rcou2.set_duty_cycle(d_a_pwm*0.001)
+        rcou3.set_duty_cycle(d_e_pwm*0.001)
+        rcou4.set_duty_cycle(d_r_pwm*0.001)
 
         # Determine if gear switch has been toggled rapidly (less than 0.5sec
         # between ON and ON) to exit program
         prev_tgear=tgear
-        if gear_switch<1500:
+        if gear_switch>1500:
             if gearflag==0:
                 tgear=time.time()
                 gearflag=1
@@ -303,17 +416,28 @@ if (mode==1 or mode==4):
         t_2=time.time()
         dt=t_2-t_1
         
-        if mode==4:
+        if mode>1:
             t_elapsed=t_2-t_start
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %d %d %d %d\n' % (t_elapsed,dt,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],int(motor[0]),int(motor[1]),int(motor[2]),int(motor[3])))
+            #t dt phi theta psi p q r ax ay az vel elev ail thr rudd
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f \n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[13],AHRS_data[14],AHRS_data[15],VELOCITY,d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
+
+        #If loop time was less than autopilot loop time, sleep the remaining time
+        t_3=time.time()
+        dt2=t_3-t_1
+        if loop_dt>dt2:
+            time.sleep(dt2-loop_dt)
+        t_4=time.time()
+        dt3=t_4-t_1
+        
+
 
         #DEBUG - output to screen
-        count=count+1
-        if count==200:
-            print('%.2f %.2f %.2f' % (d_a,d_e,d_r))
+        #count=count+1
+        #if count==200:
+        #    print('%.2f %.2f %.2f' % (d_a,d_e,d_r))
         #    print('%.2f %.2f %.2f %.1f' % (targets[0],targets[1],targets[2],1/dt))
-            print('%.2f %.2f %.2f %.1f' % (AHRS_data[0],AHRS_data[1],AHRS_data[2],1/dt))
-            count=0
+        #    print('%.2f %.2f %.2f %.1f' % (AHRS_data[0],AHRS_data[1],AHRS_data[2],1/dt))
+        #    count=0
 
 
 
@@ -337,7 +461,7 @@ if (mode==1 or mode==4):
 
 # ESC CALIBRATION MODE
 # in this mode all channels are slaved to throttle channel directly with PWM limiting
-if mode==2:
+if mode==-1:
     led.setColor('Black')
     print('ESC CALIBRATION MODE')
     print(' ')
@@ -382,8 +506,8 @@ if mode==2:
 
 
 # ---------- Exit Sequence ---------- #
-if (mode==1 or mode==4):
-    if mode==4:
+if (mode>0):
+    if mode==2:
         flt_log.close()
 
     led.setColor('Black')
