@@ -53,8 +53,8 @@ sys.path.append('/home/pi/Navio2/Python/navio')
 import mpu9250
 import Complementary_Filter2
 import ControlSurface_Calibration
-import Controls_LowLevel
-import Controls_MidLevel
+import Control_LowLevel
+import Control_MidLevel
 import read_preprogrammed_maneuver
 import PID
 import rcinput
@@ -89,6 +89,9 @@ steady_state_condition_achieved_vel=0
 man_flag=0
 maneuver_count=1
 
+#Temporary until implemented
+VELOCITY=0
+
 
 def AHRS_process(processEXIT,output_array):
     # output_array[0]=AHRS roll angle (deg)
@@ -103,9 +106,9 @@ def AHRS_process(processEXIT,output_array):
     # output_array[9]=magnetometer function check
     # output_array[10]=roll orientation offset due to installation
     # output_array[11]=pitch orientation offset due to installation
-    # output_array[13]=ax
-    # output_array[14]=ay
-    # output_array[15]=az
+    # output_array[12]=ax
+    # output_array[13]=ay
+    # output_array[14]=az
     
     print('Starting AHRS process.')
     
@@ -162,9 +165,9 @@ def AHRS_process(processEXIT,output_array):
         output_array[3]=psi_dot_d
         output_array[4]=phi_dot_d
         output_array[5]=theta_dot_d
-        output_array[13]=ax
-        output_array[14]=ay
-        output_array[15]=az
+        output_array[12]=ax
+        output_array[13]=ay
+        output_array[14]=az
 
     return None
 
@@ -272,8 +275,8 @@ if (mode>0):
                           
     # Initialize controllers
     CsCal=ControlSurface_Calibration.CS_cal()
-    LowLevel=Controls_LowLevel.LL_controls()
-    MidLevel=Controls_MidLevel.ML_controls()
+    LowLevel=Control_LowLevel.LL_controls()
+    MidLevel=Control_MidLevel.ML_controls()
                           
     time.sleep(3)
 
@@ -286,11 +289,11 @@ if (mode>0):
         sys.exit('Magnetometer reading zero!')
 
     # Setup up data log if mode calls for it
-    if mode!=1:
-        print('Setting up flight log.')
-        log_timestr = time.strftime("%d%m%Y-%H%M")
-        flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
-        flt_log.write('t dt phi theta psi p q r ax ay az vel elev ail thr rudd phi_cmd theta_cmd psi_cmd vel_cmd\n')
+    #if mode!=1:
+    print('Setting up flight log.')
+    log_timestr = time.strftime("%d%m%Y-%H%M")
+    flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
+    flt_log.write('t dt phi theta psi p q r ax ay az vel elev ail thr rudd phi_cmd theta_cmd psi_cmd vel_cmd\n')
 
     if mode==3:
         try:
@@ -449,14 +452,18 @@ if (mode>0):
         dt=t_2-t_1
         
         t_elapsed=t_2-t_start
-        #t dt phi theta psi p q r ax ay az vel elev ail thr rudd
-        flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f \n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[13],AHRS_data[14],AHRS_data[15],VELOCITY,d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
+
+        if gear_switch>1500:
+            #t dt phi theta psi p q r ax ay az vel elev ail thr rudd
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f \n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],VELOCITY,d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
         dt2=t_3-t_1
         if loop_dt>dt2:
-            time.sleep(dt2-loop_dt)
+            time.sleep(loop_dt-dt2)
+        else:
+            print('Loop time exceeded!')       
         t_4=time.time()
         dt3=t_4-t_1
         
