@@ -1,0 +1,37 @@
+#Preprogrammed maneuver file
+#
+#General format for file is:
+#'Variable'
+#<value value value>
+
+#Initial condition type*
+#1=current flight conditions
+#2=specified condition
+IC_TYPE
+1
+
+#Time (sec) that states are changed
+TIME
+3 4 5 6
+
+#Pitch angle (deg)
+THETA
+5 0 -5 0
+
+#Roll angle (deg)
+PHI
+0 0 0 0
+
+#Velocity (ft/s)**
+VEL
+-1
+
+#Throttle (%)**
+THR
+60 60 60 60
+
+
+
+#*IC_TYPE=1 does not require user to enter TIME=0 states
+#IC_TYPE=2 requires user to enter states at TIME=0, aircraft will start maneuver once it has reached the initial conditions, which will be considered TIME=0
+#**Specify either VEL or THR, not both. Set other one to -1
