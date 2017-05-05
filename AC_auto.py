@@ -4,21 +4,21 @@
     Description: Autopilot control for fixed wing aicraft for flight dynamics analysis
     
     Revision History
-    14 Feb 2016 - Created and debugged
+    05 May 2016 - Created and debugged
  
     Author: Lars Soltmann
     
     Notes:
     Written for Python3 using the RPi3+NAVDAQ+NAVIO2(by Emlid)
     
-    *RC INPUT
-    Ch1 - Roll       [0]
-    Ch2 - Pitch      [1]
-    Ch3 - Throttle   [2]
-    Ch4 - Yaw        [3]
-    Ch5 - Mode       [4]
+    RC Ch Mapping
+    Ch1 - Throttle  [0]
+    Ch2 - Aileron   [1]
+    Ch3 - Elevator  [2]
+    Ch4 - Rudder    [3]
+    Ch5 - Mode      [4]
     
-    *AXIS SYSTEM
+    AXIS SYSTEM
     
     Forward
        x
@@ -79,6 +79,15 @@ loop_dt=0.04 #Autopilot loop frequency (sec)
 steady_state_pitch_range=1 #+/-deg that pitch should be from initial condition before maneuver can start
 steady_state_roll_range=1 #+/-deg that roll should be from initial condition before maneuver can start
 steady_state_vel_range=3 #+/-deg that velocity should be from initial condition before maneuver can start
+
+count_at_steady_state_pitch=0
+count_at_steady_state_roll=0
+count_at_steady_state_vel=0
+steady_state_condition_achieved_pitch=0
+steady_state_condition_achieved_roll=0
+steady_state_condition_achieved_vel=0
+man_flag=0
+maneuver_count=1
 
 
 def AHRS_process(processEXIT,output_array):
@@ -167,15 +176,15 @@ def check_CLI_inputs():
 
     if len(sys.argv)==1:
         mode=1
-        print('No command line inputs found ... entering normal operation mode.')
+        print('No command line inputs found ... entering pass through mode with data logging.')
     elif len(sys.argv)>1:
         if sys.argv[1]=='1':
             mode=1
-            print('Entering normal operation.')
+            print('Entering pass through mode with data logging.')
 
         elif sys.argv[1]=='2':
             mode=2
-            print('Entering normal operation with data logging.')
+            print('<Undefined as of now.')
 
         elif sys.argv[1]=='3':
             if len(sys.argv)<3:
@@ -199,6 +208,34 @@ def get_current_RCinputs():
     d_r_pwm=float(rcin.read(3)) #Rudder
     return d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm
 
+def set_initial_cmds(PM,AHRS_data,d_T_cmd,VELOCITY):
+    #If mode=3 (preprogrammed maneuver) set some variables
+    if mode==3:
+        #Set the initial conditions equal to the aircraft states at activation
+        if PM.ic_type==1:
+            phi_cmd=AHRS_data[0] #roll
+            theta_cmd=AHRS_data[1] #pitch
+            psi_cmd=AHRS_data[2] #heading, not used ... just for reference
+            #V_cmd=V #velocity
+            #alt_cmd=h #altitude
+        elif (PM.ic_type==3 or PM.ic_type==4):
+            phi_cmd=PM.man_phi[0] #roll
+            theta_cmd=PM.man_theta[0] #pitch
+            psi_cmd=AHRS_data[2] #heading , not used ... just for reference
+            if PM.ic_type==3:
+                V_cmd=PM.man_vel[0]
+            elif PM.ic_type==4:
+                d_T_cmd=PM.man_thr[0]
+
+    #If mode=1,2 save the current aircraft states
+    else:
+        #Get the states when the autopilot was activated
+        phi_cmd=AHRS_data[0] #roll
+        theta_cmd=AHRS_data[1] #pitch
+        psi_cmd=AHRS_data[2] #heading
+        V_cmd=VELOCITY
+
+    return phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd
 
 
 ##### MAIN PROGRAM #####
@@ -251,7 +288,8 @@ if (mode>0):
     # Setup up data log if mode calls for it
     if mode!=1:
         print('Setting up flight log.')
-        flt_log=open('flight_log.txt', 'w')
+        log_timestr = time.strftime("%d%m%Y-%H%M")
+        flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
         flt_log.write('t dt phi theta psi p q r ax ay az vel elev ail thr rudd phi_cmd theta_cmd psi_cmd vel_cmd\n')
 
     if mode==3:
@@ -271,9 +309,9 @@ if (mode>0):
     dt3=0
 
     ##FOR DEBUG
-    d_a=0
-    d_e=0
-    d_r=0
+    #d_a=0
+    #d_e=0
+    #d_r=0
 
     while exit_flag==0:
         t_1=time.time()
@@ -290,44 +328,22 @@ if (mode>0):
         # ---- Automatic control mode
         elif gear_switch>1500:
             #Get/set initial conditions when switching into auto mode
-            if auto_at_auto_flag==1:
+            if (auto_at_auto_flag==1 and mode != 1):
+                #Initialize variables
+                count_at_steady_state_pitch=0
+                count_at_steady_state_roll=0
+                count_at_steady_state_vel=0
+                steady_state_condition_achieved_pitch=0
+                steady_state_condition_achieved_roll=0
+                steady_state_condition_achieved_vel=0
+                man_flag=0
+                maneuver_count=1
                 #Get current control surface commands
                 d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
                 #Convert control surface commands to angles
                 d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
                 
-                #If mode=3 (preprogrammed maneuver) set some variables
-                if mode==3:
-                    count_at_steady_state_pitch=0
-                    count_at_steady_state_roll=0
-                    count_at_steady_state_vel=0
-                    steady_state_condition_achieved_pitch=0
-                    steady_state_condition_achieved_roll=0
-                    steady_state_condition_achieved_vel=0
-                    man_flag=0
-                    maneuver_count=1
-                    if PM.ic_type==1:
-                        phi_cmd=AHRS_data[0] #roll
-                        theta_cmd=AHRS_data[1] #pitch
-                        psi_cmd=AHRS_data[2] #heading, not used ... just for reference
-                        #V_cmd=V #velocity
-                        #alt_cmd=h #altitude
-                    elif (PM.ic_type==3 or PM.ic_type==4):
-                        phi_cmd=PM.man_phi[0] #roll
-                        theta_cmd=PM.man_theta[0] #pitch
-                        psi_cmd=AHRS_data[2] #heading , not used ... just for reference
-                        if PM.ic_type==3:
-                            V_cmd=PM.man_vel[0]
-                        elif PM.ic_type==4:
-                            d_T_cmd=PM.man_thr[0]
-            
-                #If mode=1,2 save the current aircraft states
-                else:
-                    #Get the states when the autopilot was activated
-                    phi_cmd=AHRS_data[0] #roll
-                    theta_cmd=AHRS_data[1] #pitch
-                    psi_cmd=AHRS_data[2] #heading
-                    V_cmd=VELOCITY
+                phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,VELOCITY)
                 
                 #Seed controllers
                 LowLevel.ail_PID.integral_term=d_a_cmd
@@ -335,8 +351,24 @@ if (mode>0):
  
                 #Change flag value (only needs to be one at moment controller is activated
                 auto_at_auto_flag=0
+        
+            # PASS THROUGH MODE
+            if (mode==1 or mode==2):
+                d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
+                d_e_cmd=0
+                d_a_cmd=0
+                d_T_cmd=0
+                d_r_cmd=0
+                phi_cmd=0
+                theta_cmd=0
+                psi_cmd=0
+                V_cmd=0
+            
+            # <Currently not defined> pass through for now
+            #elif mode==2:
 
-            if mode==3:
+            # PREPROGRAMMED MANEUVER MODE
+            elif mode==3:
                 #Check to make sure that conditions are 'close' before activating maneuver
                 #If conditions are close, start maneuver
                 if (steady_state_condition_achieved_pitch==1 and steady_state_condition_achieved_roll==1 and steady_state_condition_achieved_vel==1):
@@ -416,10 +448,9 @@ if (mode>0):
         t_2=time.time()
         dt=t_2-t_1
         
-        if mode>1:
-            t_elapsed=t_2-t_start
-            #t dt phi theta psi p q r ax ay az vel elev ail thr rudd
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f \n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[13],AHRS_data[14],AHRS_data[15],VELOCITY,d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
+        t_elapsed=t_2-t_start
+        #t dt phi theta psi p q r ax ay az vel elev ail thr rudd
+        flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f \n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[13],AHRS_data[14],AHRS_data[15],VELOCITY,d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
@@ -458,7 +489,7 @@ if (mode>0):
 
 
 #------------------------------------- CALIBRATION SCRIPTS --------------------------------
-
+'''
 # ESC CALIBRATION MODE
 # in this mode all channels are slaved to throttle channel directly with PWM limiting
 if mode==-1:
@@ -504,7 +535,7 @@ if mode==-1:
         if ((tgear-prev_tgear)<0.5 and (tgear-prev_tgear)>0) and prev_tgear != 0:
             exit_flag=1
 
-
+'''
 # ---------- Exit Sequence ---------- #
 if (mode>0):
     if mode==2:
