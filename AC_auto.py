@@ -221,7 +221,6 @@ def PRESS_process(processEXIT,output_array):
     
         # Find the average velocity and altitude during the first INIT_SAMP samples
         if COUNT<(INIT_SAMP):
-            print('run')
             output_array[2]=output_array[2]+output_array[0]/INIT_SAMP #Average velocity offset
             output_array[3]=output_array[3]+output_array[1]/INIT_SAMP #Average altitude offset
             COUNT=COUNT+1
@@ -357,10 +356,12 @@ if (mode>0):
     print('Setting up flight log.')
     try:
         log_timestr = time.strftime("%d%m%Y-%H%M")
-        log_timestr2= time.strftime("%d-%m-%Y--%H:%M")
+        #log_timestr2= time.strftime("%d-%m-%Y--%H:%M")
+        log_timestr2= time.asctime()
         flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
-        flt_log.write('Date[d-m-y] -- Time[H:M]\n')
-        flt_log.write(log_timestr2)
+        #flt_log.write('Date[d-m-y] -- Time[H:M]\n')
+        #flt_log.write(log_timestr2)
+        flt_log.write(log_timestr2+' local time')
         flt_log.write('\n\n')
         flt_log.write('Velocity/Altitude Offsets\n')
         flt_log.write('%.1f %.0f\n' % (PRESS_data[2],PRESS_data[3]))
@@ -379,8 +380,8 @@ if (mode>0):
             sys.exit('Error processing maneuver file!')
 
 
-    print('Initialization complete.\n'
-    print('Starting autopilot loop...\n')
+    print('Initialization complete.')
+    print('Starting autopilot loop...')
     t_start=time.time()
     
     count=0 # Used for reduced frame rate output to screen
