@@ -198,15 +198,25 @@ def PRESS_process(processEXIT,output_array):
         pt.readPressure_raw()
         pt_press=pt.convertPressure(1,5)*5.2023300231 #inH2O to PSF
         if pt_press>0:
-            output_array[0]=(math.sqrt(pt_press*841.4321175))-output_array[2] #Indicated velocity in ft/s (841.43=2/0.0023769)
+            # If averaging loop has finished, subtracted the average
+            if COUNT==INIT_SAMP:
+                output_array[0]=(math.sqrt(pt_press*841.4321175))-output_array[2] #Indicated velocity in ft/s (841.43=2/0.0023769)
+            # If averaging loop hasn't finished, don't subtract
+            else:
+                output_array[0]=(math.sqrt(pt_press*841.4321175)) #Indicated velocity in ft/s (841.43=2/0.0023769) 
         else:
             output_array[0]=0
         
         st.read_pressure_temperature()
         st_temp=st.getTemperature_degF()
         st_press=st.getPressure_mbar()
-        output_array[1]=(1.4536645e5-38951.51955*st_press**0.190284)-output_array[3] #Pressure altitude in ft
-        
+        # If averaging loop has finished, subtracted the average
+        if COUNT==INIT_SAMP:
+            output_array[1]=(1.4536645e5-38951.51955*st_press**0.190284)-output_array[3] #Pressure altitude in ft
+        # If averaging loop hasn't finished, don't subtract
+        else:
+            output_array[1]=(1.4536645e5-38951.51955*st_press**0.190284) #Pressure altitude in ft   
+            
         ## Tracking filter goes here
     
         # Find the average velocity and altitude during the first INIT_SAMP samples
