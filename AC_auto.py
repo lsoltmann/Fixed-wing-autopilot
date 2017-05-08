@@ -21,10 +21,10 @@
     AXIS SYSTEM
     
     Forward
-    x
-    |
-    0-y
-    /
+      x
+      |
+      0-y
+     /
     z (into page)
     
     Aircraft body-axis coordinate system, right hand rule
@@ -35,7 +35,16 @@
     Cyan = Ready to fly, no GPS fix
     Red (flashing) = throttle not set at zero, move throttle to zero
     Red (solid) = Error
-        
+
+    Orientation definitions:
+    1 = right side up, USB ports facing forward
+    2 = right side up, USB facing to the right
+    3 = right side up, USB facing backwards
+    4 = right side up, USB facing to the left
+    5 = upside down, USB ports facing forward
+    6 = upside down, USB facing to the right
+    7 = upside down, USB facing backwards
+    8 = upside down, USB facing to the left        
 '''
 
 from multiprocessing import Process, Array, Value
@@ -72,6 +81,7 @@ tgear=0
 gearflag=0
 
 ## VARIABLE DEFINITIONS ##
+ORIENTATION=5
 hix=-13.696 #Hard iron offset, x (from calibration)
 hiy=34.376 #Hard iron offset, y (from calibration)
 hiz=-10.118 #Hard iron offset, z (from calibration)
@@ -138,12 +148,20 @@ def AHRS_process(processEXIT,output_array):
 
     while processEXIT.value==0:
         m9a, m9g, m9m = imu.getMotion9()
-        gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
-        gy=(m9g[0]-g_offset[1])*57.2958
-        gz=(-m9g[2]-g_offset[2])*57.2958
-        ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
-        ay=m9a[0]*0.10197
-        az=-m9a[2]*0.10197
+        if output_array[15]==1:
+            gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
+            gy=(m9g[0]-g_offset[1])*57.2958
+            gz=(-m9g[2]-g_offset[2])*57.2958
+            ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
+            ay=m9a[0]*0.10197
+            az=-m9a[2]*0.10197
+        elif output_array[15]==5:## NEEDS TO BE UPDATED
+            gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
+            gy=(m9g[0]-g_offset[1])*57.2958
+            gz=(-m9g[2]-g_offset[2])*57.2958
+            ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
+            ay=m9a[0]*0.10197
+            az=-m9a[2]*0.10197
         att.attitude3(ax,ay,az,gx,gy,gz,m9m[0],m9m[1],m9m[2])
         
         # Apply LPF (only for ouput data)
@@ -323,7 +341,7 @@ if (mode>0):
     
     ## Subprocesses
     # Subprocess array for AHRS and pressure transducer data
-    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0.0,0.0,0.0,0.0,0.0])
+    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
     PRESS_data=Array('d',[0.0,0.0,0.0,0.0])
     
     # Subprocess value that sets exit flag
