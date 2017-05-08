@@ -155,9 +155,9 @@ class read_maneuver_file:
             sys.exit('First maneuver time entry needs to be zero if IC_TYPE=2!')
 
         ##Change the IC_TYPE to reflect whether velocity or throttle is to be used
-        if self.man_thr[0]=-1:
+        if self.man_thr[0]==-1:
             self.ic_type=3
-        elif self.man_vel[0]=-1:
+        elif self.man_vel[0]==-1:
             self.ic_type=4
         else:
             sys.exit('Error occured while assigning IC_TYPE from velocity/throttle!')
