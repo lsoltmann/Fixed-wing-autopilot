@@ -384,8 +384,10 @@ if (mode>0):
         flt_log.write('Velocity/Altitude Offsets\n')
         flt_log.write('%.1f %.0f\n' % (PRESS_data[2],PRESS_data[3]))
         flt_log.write('\n')
-        flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD PHI_CMD THETA_CMD PSI_CMD VEL_CMD\n')
-        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft deg deg % deg deg deg deg ft/s\n')
+        #flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD PHI_CMD THETA_CMD PSI_CMD VEL_CMD\n')
+        #flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft deg deg % deg deg deg deg ft/s\n')
+        flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD\n')
+        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft PWM PWM PWM PWM\n')
     except:
         led.setColor('Red')
         sys.exit('Error creating log file!')
@@ -415,7 +417,7 @@ if (mode>0):
         
         # ---- Pass through mode
         if gear_switch<=1500:
-            # Straight pass through
+            # Straight pass through since saftey switch has taken FCS out of the loop
             d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
             auto_at_auto_flag=1
 
@@ -545,8 +547,12 @@ if (mode>0):
         t_elapsed=t_2-t_start
         
         if gear_switch>1500:
-            #T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD PHI_CMD THETA_CMD PSI_CMD VEL_CMD
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
+            #                                                                                                        THETA_CMD VEL_CMD
+            #              T    DT   PHI THETA PSI  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD PHI_CMD   PSI_CMD 
+            #flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
+            #                                                                                                 
+            #              T    DT   PHI THETA PSI  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD [PWM]            
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %d %d %d %d\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_pwm,d_a_pwm,d_T_pwm,d_r_pwm))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
