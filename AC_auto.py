@@ -132,7 +132,8 @@ def AHRS_process(processEXIT,output_array):
         g_offset[2]=g_offset[2]+m9g[2]/100
         g_offset[2]=-g_offset[2] #because z-axis is oriented 180deg
 
-        if (m9m[0]==0.0 or m9m[1]==0.0 or m9m[2]==0.0):
+        if (m9m[0]==0.0 and m9m[1]==0.0 and m9m[2]==0.0):
+            print(m9m)
             output_array[9]=1.0
 
     while processEXIT.value==0:
@@ -210,6 +211,7 @@ def PRESS_process(processEXIT,output_array):
     
         # Find the average velocity and altitude during the first INIT_SAMP samples
         if COUNT<(INIT_SAMP):
+            print('run')
             output_array[2]=output_array[2]+output_array[0]/INIT_SAMP #Average velocity offset
             output_array[3]=output_array[3]+output_array[1]/INIT_SAMP #Average altitude offset
             COUNT=COUNT+1
@@ -259,7 +261,7 @@ def get_current_RCinputs():
     d_r_pwm=float(rcin.read(3)) #Rudder
     return d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm
 
-def set_initial_cmds(PM,AHRS_data,d_T_cmd,PRESS_data[0]):
+def set_initial_cmds(PM,AHRS_data,d_T_cmd,PRESS_data):
     #If mode=3 (preprogrammed maneuver) set some variables
     if mode==3:
         #Set the initial conditions equal to the aircraft states at activation
@@ -348,13 +350,13 @@ if (mode>0):
         log_timestr2= time.strftime("%d-%m-%Y--%H:%M")
         flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
         flt_log.write('Date[d-m-y] -- Time[H:M]\n')
-        flt_log.write(log_timestr)
-        flt_log.write('\n')
+        flt_log.write(log_timestr2)
+        flt_log.write('\n\n')
         flt_log.write('Velocity/Altitude Offsets\n')
         flt_log.write('%.1f %.0f\n' % (PRESS_data[2],PRESS_data[3]))
         flt_log.write('\n')
         flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD PHI_CMD THETA_CMD PSI_CMD VEL_CMD\n')
-        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft deg deg % deg deg deg deg ft/s')
+        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft deg deg % deg deg deg deg ft/s\n')
     except:
         led.setColor('Red')
         sys.exit('Error creating log file!')
@@ -367,18 +369,14 @@ if (mode>0):
             sys.exit('Error processing maneuver file!')
 
 
-    print('Initialization complete. Starting control loops...')
+    print('Initialization complete.\n'
+    print('Starting autopilot loop...\n')
     t_start=time.time()
     
     count=0 # Used for reduced frame rate output to screen
     auto_at_auto_flag=1
     led.setColor('Cyan')
     dt3=0
-    
-    ##FOR DEBUG
-    #d_a=0
-    #d_e=0
-    #d_r=0
     
     while exit_flag==0:
         t_1=time.time()
@@ -391,7 +389,7 @@ if (mode>0):
             # Straight pass through
             d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
             auto_at_auto_flag=1
-        
+
         # ---- Automatic control mode
         elif gear_switch>1500:
             #Get/set initial conditions when switching into auto mode
@@ -487,11 +485,11 @@ if (mode>0):
                     elif PM.ic_type==4:
                         steady_state_condition_achieved_vel=1
         
-        
-            #MidLevel.controllers(psi_cmd,AHRS_data[0],alt_cmd,h_meas,V_cmd,V_meas)
-            d_a_cmd,d_e_cmd,d_r_cmd=LowLevel.controllers(phi_cmd,AHRS_data[0],theta_cmd,AHRS_data[1],AHRS_data[3],0)
-            d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd)
-            d_T_pwm=float(rcin.read(0)) ##Throttle hard coded to manual
+            if mode!=1:
+                #MidLevel.controllers(psi_cmd,AHRS_data[0],alt_cmd,h_meas,V_cmd,V_meas)
+                d_a_cmd,d_e_cmd,d_r_cmd=LowLevel.controllers(phi_cmd,AHRS_data[0],theta_cmd,AHRS_data[1],AHRS_data[3],0)
+                d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd)
+                d_T_pwm=float(rcin.read(0)) ##Throttle hard coded to manual
         
         # Send servo commands to RCoutput --- CHECK THIS MAPPING
         rcou1.set_duty_cycle(d_T_pwm*0.001) # u_sec to m_sec
