@@ -36,7 +36,7 @@
     Red (flashing) = throttle not set at zero, move throttle to zero
     Red (solid) = Error
 
-    Orientation definitions:
+    Orientation definitions: [when viewed from above]
     1 = right side up, USB ports facing forward
     2 = right side up, USB facing to the right
     3 = right side up, USB facing backwards
@@ -117,6 +117,10 @@ def AHRS_process(processEXIT,output_array):
     # output_array[12]=ax
     # output_array[13]=ay
     # output_array[14]=az
+    # output_array[15]=p
+    # output_array[16]=q
+    # output_array[17]=r  
+    # output_array[18]=orientation
     
     print('Starting AHRS process.')
     
@@ -148,20 +152,20 @@ def AHRS_process(processEXIT,output_array):
 
     while processEXIT.value==0:
         m9a, m9g, m9m = imu.getMotion9()
-        if output_array[15]==1:
+        if output_array[18]==1:
             gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
             gy=(m9g[0]-g_offset[1])*57.2958
             gz=(-m9g[2]-g_offset[2])*57.2958
             ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
             ay=m9a[0]*0.10197
             az=-m9a[2]*0.10197
-        elif output_array[15]==5:## NEEDS TO BE UPDATED
+        elif output_array[18]==5:## NEEDS TO BE UPDATED
             gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
-            gy=(m9g[0]-g_offset[1])*57.2958
-            gz=(-m9g[2]-g_offset[2])*57.2958
+            gy=(-m9g[0]-g_offset[1])*57.2958
+            gz=(m9g[2]-g_offset[2])*57.2958
             ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
-            ay=m9a[0]*0.10197
-            az=-m9a[2]*0.10197
+            ay=-m9a[0]*0.10197
+            az=m9a[2]*0.10197
         att.attitude3(ax,ay,az,gx,gy,gz,m9m[0],m9m[1],m9m[2])
         
         # Apply LPF (only for ouput data)
@@ -185,6 +189,9 @@ def AHRS_process(processEXIT,output_array):
         output_array[12]=ax
         output_array[13]=ay
         output_array[14]=az
+        output_array[15]=gx
+        output_array[16]=gy
+        output_array[17]=gz
     
     return None
 
@@ -341,7 +348,7 @@ if (mode>0):
     
     ## Subprocesses
     # Subprocess array for AHRS and pressure transducer data
-    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
+    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
     PRESS_data=Array('d',[0.0,0.0,0.0,0.0])
     
     # Subprocess value that sets exit flag
@@ -386,8 +393,8 @@ if (mode>0):
         flt_log.write('\n')
         #flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD PHI_CMD THETA_CMD PSI_CMD VEL_CMD\n')
         #flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft deg deg % deg deg deg deg ft/s\n')
-        flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD\n')
-        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft PWM PWM PWM PWM\n')
+        flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD\n')
+        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft PWM PWM PWM PWM\n')
     except:
         led.setColor('Red')
         sys.exit('Error creating log file!')
@@ -551,8 +558,8 @@ if (mode>0):
             #              T    DT   PHI THETA PSI  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD PHI_CMD   PSI_CMD 
             #flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
             #                                                                                                 
-            #              T    DT   PHI THETA PSI  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD [PWM]            
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %d %d %d %d\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_pwm,d_a_pwm,d_T_pwm,d_r_pwm))
+            #              T    DT   PHI THETA PSI  PHID THTD PSID  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD [PWM]            
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %d %d %d %d\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[15],AHRS_data[16],AHRS_data[17],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_pwm,d_a_pwm,d_T_pwm,d_r_pwm))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
@@ -566,12 +573,13 @@ if (mode>0):
 
         #DEBUG - output to screen
         #count=count+1
-        #if count==200:
-        #    print('%.2f %.2f %.2f' % (d_a,d_e,d_r))
-        #    print('%.2f %.2f %.2f %.1f' % (targets[0],targets[1],targets[2],1/dt))
-        #    print('%.2f %.2f %.2f %.1f' % (AHRS_data[0],AHRS_data[1],AHRS_data[2],1/dt))
-        #    count=0
-
+        #if count==25:
+            #print('%.2f %.2f %.2f' % (d_a,d_e,d_r))
+            #print('%.2f %.2f %.2f %.1f' % (targets[0],targets[1],targets[2],1/dt))
+            #print('%.2f %.2f %.2f %.2f %.2f %.2f %.1f' % (AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],1/dt))
+            #count=0
+        #print(PRESS_data[0])
+        #print(PRESS_data[1])
 
 
 
@@ -637,7 +645,7 @@ if (mode>0):
     if ((tgear-prev_tgear)<0.5 and (tgear-prev_tgear)>0) and prev_tgear != 0:
     exit_flag=1
     
-    '''
+'''
 # ---------- Exit Sequence ---------- #
 if (mode>0):
     if mode==2:
