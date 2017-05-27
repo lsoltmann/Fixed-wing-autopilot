@@ -82,9 +82,12 @@ gearflag=0
 
 ## VARIABLE DEFINITIONS ##
 ORIENTATION=5
-hix=-13.696 #Hard iron offset, x (from calibration)
-hiy=34.376 #Hard iron offset, y (from calibration)
-hiz=-10.118 #Hard iron offset, z (from calibration)
+
+# Hard iron offsets measured on 27May2017 on Firstar V2
+hix=-18.117 #Hard iron offset, x (from calibration)
+hiy=27.974 #Hard iron offset, y (from calibration)
+hiz=-17.841 #Hard iron offset, z (from calibration)
+
 steady_state_time=1 #Number of seconds that the aircraft must be at the initial condition (only for IC_TYPE=2) before the preprogrammed maneuver starts
 loop_dt=0.04 #Autopilot loop frequency (sec)
 steady_state_pitch_range=1 #+/-deg that pitch should be from initial condition before maneuver can start
