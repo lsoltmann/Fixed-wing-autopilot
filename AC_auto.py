@@ -88,6 +88,9 @@ hix=-18.117 #Hard iron offset, x (from calibration)
 hiy=27.974 #Hard iron offset, y (from calibration)
 hiz=-17.841 #Hard iron offset, z (from calibration)
 
+theta_offset=0.0 #deg
+phi_offset=-0.6
+
 steady_state_time=1 #Number of seconds that the aircraft must be at the initial condition (only for IC_TYPE=2) before the preprogrammed maneuver starts
 loop_dt=0.04 #Autopilot loop frequency (sec)
 steady_state_pitch_range=1 #+/-deg that pitch should be from initial condition before maneuver can start
@@ -147,24 +150,23 @@ def AHRS_process(processEXIT,output_array):
         g_offset[0]=g_offset[0]+m9g[1]/100
         g_offset[1]=g_offset[1]+m9g[0]/100
         g_offset[2]=g_offset[2]+m9g[2]/100
-        g_offset[2]=-g_offset[2] #because z-axis is oriented 180deg
 
         if (m9m[0]==0.0 and m9m[1]==0.0 and m9m[2]==0.0):
-            print(m9m)
             output_array[9]=1.0
 
+    #g_offset[2]=-g_offset[2] #because z-axis is oriented 180deg
     while processEXIT.value==0:
         m9a, m9g, m9m = imu.getMotion9()
         if output_array[18]==1:
             gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
             gy=(m9g[0]-g_offset[1])*57.2958
-            gz=(-m9g[2]-g_offset[2])*57.2958
+            gz=-(m9g[2]-g_offset[2])*57.2958
             ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
             ay=m9a[0]*0.10197
             az=-m9a[2]*0.10197
         elif output_array[18]==5:## NEEDS TO BE UPDATED
             gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
-            gy=(-m9g[0]-g_offset[1])*57.2958
+            gy=-(m9g[0]-g_offset[1])*57.2958
             gz=(m9g[2]-g_offset[2])*57.2958
             ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
             ay=-m9a[0]*0.10197
@@ -351,7 +353,7 @@ if (mode>0):
     
     ## Subprocesses
     # Subprocess array for AHRS and pressure transducer data
-    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
+    AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,phi_offset,theta_offset,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
     PRESS_data=Array('d',[0.0,0.0,0.0,0.0])
     
     # Subprocess value that sets exit flag
