@@ -201,30 +201,39 @@ def AHRS_process(processEXIT,output_array):
     return None
 
 # Subprocess for pressure transducers
-def PRESS_process(processEXIT,output_array):
+def ARSP_ALT_process(processEXIT,output_array):
     # output_array[0]=Velocity (ft/s)
     # output_array[1]=Altitude (ft)
     # output_array[2]=Velocity offset (ft/s)
     # output_array[3]=Altitude offset (ft) - Pressure altitude at initialization location
+    # output_array[4]=Filtered velocity (ft/s)
+    # output_array[5]=Filtered altitude (ft)
+    # output_array[6]=Filtered velocity_dot (ft/s)
+    # output_array[7]=Filtered altitude_dot [VSI] (ft)
 
     # Create and initialize pressure transducers
     pt=SSC005D.HWSSC(0x28) #Pitot-static, differential
     st=MS5805.MS5805(0x76) #Static, absolute
     st.initialize()
+    
+    # Create tracking filter
+    #ALTITUDE
+    h_TF=trackfilt(0.05,0.005)
+    #AIRSPEED
+    V_TF=trackfilt(0.2,0.005)
 
-    #Setup the GPIO and set GPIO 17 and 24 low. The NAVDAQ shields contains a 74HC4052DIP multiplexer and both pins low access the pitot-static tube pressure transducer
+    # Setup the GPIO and set GPIO 17 and 24 low. The NAVDAQ shields contains a 74HC4052DIP multiplexer and both pins low access the pitot-static tube pressure transducer
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(17, GPIO.OUT)
     GPIO.setup(24, GPIO.OUT)
     GPIO.output(17, GPIO.LOW)
     GPIO.output(24, GPIO.LOW)
     
-    output_array[2]=0
-    output_array[3]=0
     INIT_SAMP=10
     COUNT=0
 
     while processEXIT.value==0:
+        t1=time.time()
         pt.readPressure_raw()
         pt_press=pt.convertPressure(1,5)*5.2023300231 #inH2O to PSF
         if pt_press>0:
@@ -246,10 +255,18 @@ def PRESS_process(processEXIT,output_array):
         # If averaging loop hasn't finished, don't subtract
         else:
             output_array[1]=(1.4536645e5-38951.51955*st_press**0.190284) #Pressure altitude in ft   
-            
-        ## Tracking filter goes here
+        
+        # Get loop time for filter
+        t2=time.time()
+        dt=t2-t1
+        # If averaging loop has finished, run airspeed and altitude through filter
+        if COUNT==INIT_SAMP:
+            output_array[5],output_array[7]=h_TF.track(output_array[1],dt)
+            output_array[4],output_array[6]=V_TF.track(output_array[0],dt)
+        else:
+            pass
     
-        # Find the average velocity and altitude during the first INIT_SAMP samples
+        # Find the average velocity and altitude during the first INIT_SAMP samples to use as the velocity transducer offset and ground level altitude offset
         if COUNT<(INIT_SAMP):
             output_array[2]=output_array[2]+output_array[0]/INIT_SAMP #Average velocity offset
             output_array[3]=output_array[3]+output_array[1]/INIT_SAMP #Average altitude offset
@@ -261,8 +278,8 @@ def PRESS_process(processEXIT,output_array):
 
 def check_CLI_inputs():
     #Modes:
-    # 1 = Pass through
-    # 2 = Pass through with data logging
+    # 1 = Pass through with data logging
+    # 2 = <Undefined for now> [Pass through with data logging]
     # 3 = Preprogrammed maneuver mode [with data logging]
     
     if len(sys.argv)==1:
@@ -300,7 +317,7 @@ def get_current_RCinputs():
     d_r_pwm=float(rcin.read(3)) #Rudder
     return d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm
 
-def set_initial_cmds(PM,AHRS_data,d_T_cmd,PRESS_data):
+def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
     #If mode=3 (preprogrammed maneuver) set some variables
     if mode==3:
         #Set the initial conditions equal to the aircraft states at activation
@@ -325,7 +342,7 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,PRESS_data):
         phi_cmd=AHRS_data[0] #roll
         theta_cmd=AHRS_data[1] #pitch
         psi_cmd=AHRS_data[2] #heading
-        V_cmd=PRESS_data[0]
+        V_cmd=ARSP_ALT_data[0]
     
     return phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd
 
@@ -354,18 +371,18 @@ if (mode>0):
     ## Subprocesses
     # Subprocess array for AHRS and pressure transducer data
     AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,phi_offset,theta_offset,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
-    PRESS_data=Array('d',[0.0,0.0,0.0,0.0])
+    ARSP_ALT_data=Array('d',[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
     
     # Subprocess value that sets exit flag
     process_EXIT=Value('i', 0)
     
     # Define the subprocesses
     AHRS_proc=Process(target=AHRS_process, args=(process_EXIT,AHRS_data))
-    PRESS_proc=Process(target=PRESS_process, args=(process_EXIT,PRESS_data))
+    ARSP_ALT_proc=Process(target=ARSP_ALT_process, args=(process_EXIT,ARSP_ALT_data))
     
     # Start the subprocesses
     AHRS_proc.start()
-    PRESS_proc.start()
+    ARSP_ALT_proc.start()
     
     # Initialize controllers
     CsCal=ControlSurface_Calibration.CS_cal()
@@ -386,20 +403,15 @@ if (mode>0):
     print('Setting up flight log.')
     try:
         log_timestr = time.strftime("%d%m%Y-%H%M")
-        #log_timestr2= time.strftime("%d-%m-%Y--%H:%M")
         log_timestr2= time.asctime()
         flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
-        #flt_log.write('Date[d-m-y] -- Time[H:M]\n')
-        #flt_log.write(log_timestr2)
-        flt_log.write(log_timestr2+' local time')
+        flt_log.write('# '+log_timestr2+' local time')
         flt_log.write('\n\n')
-        flt_log.write('Velocity/Altitude Offsets\n')
-        flt_log.write('%.1f %.0f\n' % (PRESS_data[2],PRESS_data[3]))
+        flt_log.write('# Velocity/Altitude Offsets\n')
+        flt_log.write('# %.1f %.0f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
         flt_log.write('\n')
-        #flt_log.write('T DT PHI THETA PSI P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD PHI_CMD THETA_CMD PSI_CMD VEL_CMD\n')
-        #flt_log.write('sec sec deg deg deg deg/s deg/s deg/s g g g ft/s ft deg deg % deg deg deg deg ft/s\n')
-        flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT ELEV AIL THR RUDD\n')
-        flt_log.write('sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft PWM PWM PWM PWM\n')
+        flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD\n')
+        flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM\n')
     except:
         led.setColor('Red')
         sys.exit('Error creating log file!')
@@ -451,7 +463,7 @@ if (mode>0):
                 #Convert control surface commands to angles
                 d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
                 
-                phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,PRESS_data[0])
+                phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data[0])
                 
                 #Seed controllers
                 LowLevel.ail_PID.integral_term=d_a_cmd
@@ -518,9 +530,9 @@ if (mode>0):
                     
                     #Check to make sure velocity is within +/- 'steady_state_vel_range' for a certain amount of time before starting maneuver
                     if PM.ic_type==3:
-                        if abs(PRESS_data[0]-V_cmd)<steady_state_vel_range and count_at_steady_state_vel<(steady_state_time/loop_dt):
+                        if abs(ARSP_ALT_data[0]-V_cmd)<steady_state_vel_range and count_at_steady_state_vel<(steady_state_time/loop_dt):
                             count_at_steady_state_vel+=1
-                        elif abs(PRESS_data[0]-V_cmd)>steady_state_vel_range:
+                        elif abs(ARSP_ALT_data[0]-V_cmd)>steady_state_vel_range:
                             count_at_steady_state_vel=0
                         else:
                             steady_state_condition_achieved_vel=1
@@ -558,13 +570,9 @@ if (mode>0):
         
         t_elapsed=t_2-t_start
         
-        if gear_switch>1500:
-            #                                                                                                        THETA_CMD VEL_CMD
-            #              T    DT   PHI THETA PSI  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD PHI_CMD   PSI_CMD 
-            #flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_cmd,d_a_cmd,d_T_cmd,d_r_cmd, phi_cmd, theta_cmd, psi_cmd, V_cmd))
-            #                                                                                                 
-            #              T    DT   PHI THETA PSI  PHID THTD PSID  P    Q    R    AX   AY   AZ   IAS  ALT  ELEV AIL  THR  RUDD [PWM]            
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %d %d %d %d\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[15],AHRS_data[16],AHRS_data[17],AHRS_data[12],AHRS_data[13],AHRS_data[14],PRESS_data[0],PRESS_data[1],d_e_pwm,d_a_pwm,d_T_pwm,d_r_pwm))
+        if gear_switch>1500:       
+            #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R    AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF ELEV AIL THR RUDD          
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[15],AHRS_data[16],AHRS_data[17],AHRS_data[12],AHRS_data[13],AHRS_data[14],ARSP_ALT_data[0],ARSP_ALT_data[1],d_e_pwm,d_a_pwm,d_T_pwm,d_r_pwm))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
@@ -583,74 +591,9 @@ if (mode>0):
             #print('%.2f %.2f %.2f %.1f' % (targets[0],targets[1],targets[2],1/dt))
             #print('%.2f %.2f %.2f %.2f %.2f %.2f %.1f' % (AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],1/dt))
             #count=0
-        #print(PRESS_data[0])
-        #print(PRESS_data[1])
+        #print(ARSP_ALT_data[0])
+        #print(ARSP_ALT_data[1])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#------------------------------------- CALIBRATION SCRIPTS --------------------------------
-'''
-    # ESC CALIBRATION MODE
-    # in this mode all channels are slaved to throttle channel directly with PWM limiting
-    if mode==-1:
-    led.setColor('Black')
-    print('ESC CALIBRATION MODE')
-    print(' ')
-    dummy=input('Press any key to start')
-    print(' ')
-    while exit_flag==0:
-    # Get inputs from the receiver and slave them to throttle channel
-    RCinput[0]=1500
-    RCinput[1]=1500
-    RCinput[2]=float(rcin.read(0)) #Throttle
-    RCinput[3]=1500
-    gear_switch=float(rcin.read(4)) #Mode
-    # Limit PWM output between MIN MAX values
-    if RCinput[2]>config.PWM_MAX:
-    servo_out[2]=config.PWM_MAX
-    elif RCinput[2]<config.PWM_MIN:
-    servo_out[2]=config.PWM_MIN
-    else:
-    servo_out[2]=RCinput[2]
-    
-    # Send motor commands to RCoutput
-    rcou1.set_duty_cycle(servo_out[0]*0.001) # u_sec to m_sec
-    rcou2.set_duty_cycle(servo_out[1]*0.001)
-    rcou3.set_duty_cycle(servo_out[2]*0.001)
-    rcou4.set_duty_cycle(servo_out[3]*0.001)
-    
-    # Output to console
-    print('PWM out = %d uS' % servo_out[2])
-    time.sleep(0.02)
-    
-    # Determine if gear switch has been toggled rapidly (less than 0.5sec
-    # between ON and ON) to exit program
-    prev_tgear=tgear
-    if gear_switch<1500:
-    if gearflag==0:
-    tgear=time.time()
-    gearflag=1
-    else:
-    gearflag=0
-    if ((tgear-prev_tgear)<0.5 and (tgear-prev_tgear)>0) and prev_tgear != 0:
-    exit_flag=1
-    
-'''
 # ---------- Exit Sequence ---------- #
 if (mode>0):
     if mode==2:
@@ -658,7 +601,7 @@ if (mode>0):
 
     led.setColor('Black')
     AHRS_proc.join()
-    PRESS_proc.join()
+    ARSP_ALT_proc.join()
     #GPS_proc.join()
 
     led.setColor('Red')
