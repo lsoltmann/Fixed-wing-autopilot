@@ -572,7 +572,30 @@ if (mode>0):
         
         if gear_switch>1500:       
             #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R    AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF ELEV AIL THR RUDD          
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d\n' % (t_elapsed,dt3,AHRS_data[0],AHRS_data[1],AHRS_data[2],AHRS_data[4],AHRS_data[5],AHRS_data[3],AHRS_data[15],AHRS_data[16],AHRS_data[17],AHRS_data[12],AHRS_data[13],AHRS_data[14],ARSP_ALT_data[0],ARSP_ALT_data[1],d_e_pwm,d_a_pwm,d_T_pwm,d_r_pwm))
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d\n' % (t_elapsed,
+                                                                                                                                                 dt3,
+                                                                                                                                                 AHRS_data[0],
+                                                                                                                                                 AHRS_data[1],
+                                                                                                                                                 AHRS_data[2],
+                                                                                                                                                 AHRS_data[4],
+                                                                                                                                                 AHRS_data[5],
+                                                                                                                                                 AHRS_data[3],
+                                                                                                                                                 AHRS_data[15],
+                                                                                                                                                 AHRS_data[16],
+                                                                                                                                                 AHRS_data[17],
+                                                                                                                                                 AHRS_data[12],
+                                                                                                                                                 AHRS_data[13],
+                                                                                                                                                 AHRS_data[14],
+                                                                                                                                                 ARSP_ALT_data[0],
+                                                                                                                                                 ARSP_ALT_data[1],
+                                                                                                                                                 ARSP_ALT_data[4],
+                                                                                                                                                 ARSP_ALT_data[5],
+                                                                                                                                                 ARSP_ALT_data[6],
+                                                                                                                                                 ARSP_ALT_data[7],
+                                                                                                                                                 d_e_pwm,
+                                                                                                                                                 d_a_pwm,
+                                                                                                                                                 d_T_pwm,
+                                                                                                                                                 d_r_pwm))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
