@@ -4,7 +4,7 @@
     Description: Autopilot control for fixed wing aicraft for flight dynamics analysis
     
     Revision History
-    05 May 2016 - Created and debugged
+    05 May 2016 - Created
     
     Author: Lars Soltmann
     
@@ -153,8 +153,8 @@ def AHRS_process(processEXIT,output_array):
 
         if (m9m[0]==0.0 and m9m[1]==0.0 and m9m[2]==0.0):
             output_array[9]=1.0
-
-    #g_offset[2]=-g_offset[2] #because z-axis is oriented 180deg
+            
+    # Main AHRS loop
     while processEXIT.value==0:
         m9a, m9g, m9m = imu.getMotion9()
         if output_array[18]==1:
@@ -164,7 +164,7 @@ def AHRS_process(processEXIT,output_array):
             ax=m9a[1]*0.10197 #Convert to g-force (1/9.81)
             ay=m9a[0]*0.10197
             az=-m9a[2]*0.10197
-        elif output_array[18]==5:## NEEDS TO BE UPDATED
+        elif output_array[18]==5:
             gx=(m9g[1]-g_offset[0])*57.2958 #Convert to deg/s
             gy=-(m9g[0]-g_offset[1])*57.2958
             gz=(m9g[2]-g_offset[2])*57.2958
@@ -278,27 +278,29 @@ def ARSP_ALT_process(processEXIT,output_array):
 
 def check_CLI_inputs():
     #Modes:
-    # 1 = Pass through with data logging
-    # 2 = <Undefined for now> [Pass through with data logging]
-    # 3 = Preprogrammed maneuver mode [with data logging]
+    # 1 = Pass through
+    # 2 = Preprogrammed maneuver [open loop]
+    # 3 = Preprogrammed maneuver [closed loop]
     
     if len(sys.argv)==1:
         mode=1
-        print('No command line inputs found ... entering pass through mode with data logging.')
+        print('No command line inputs found ... entering pass through mode.')
     elif len(sys.argv)>1:
         if sys.argv[1]=='1':
             mode=1
-            print('Entering pass through mode with data logging.')
+            print('Entering pass through mode.')
         
         elif sys.argv[1]=='2':
+            if len(sys.argv)<3:
+                sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
             mode=2
-            print('<Undefined as of now.')
+            print('Entering open loop maneuver mode.')
         
         elif sys.argv[1]=='3':
             if len(sys.argv)<3:
                 sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
             mode=3
-            print('Entering maneuver mode.')
+            print('Entering closed loop maneuver mode.')
         
         elif sys.argv[1]=='-1':
             mode=-1
@@ -487,7 +489,7 @@ if (mode>0):
             # <Currently not defined> pass through for now
             #elif mode==2:
             
-            # PREPROGRAMMED MANEUVER MODE
+            # PREPROGRAMMED MANEUVER MODE - CLOSED LOOP
             elif mode==3:
                 #Check to make sure that conditions are 'close' before activating maneuver
                 #If conditions are close, start maneuver
