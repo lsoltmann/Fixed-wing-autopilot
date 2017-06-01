@@ -12,37 +12,13 @@
     
     Calls: None
     
-    Inputs: maneuver.txt
+    Inputs: maneuver_CL.txt or maneuver_OL.txt
             
     Outputs:
     
     Notes:
     - Written for Python3
-    - File format for configuration file:
-    ______________________________
-    #Configuration file
-    #
-    #General format for file is:
-    #'Variable'
-    #<values>
-    #
-    
-    IC_TYPE <-- Either 1 or 2 [1=current conditions, 2=specified conditions]
-    1
-    
-    TIME
-    0 0.5 1 1.5 2 2.5
-
-    THETA
-    0 0 5 0 0 -5
-
-    VEL
-    60 60 60 70 70 70
-    
-    ... etc
-    ______________________________
-    
-    *The number of columns for each variable must be equal across all variables
+    - See maneuver file for file format:
     
 '''
 
@@ -58,11 +34,12 @@ class read_maneuver_file:
         #Open the config file
         file1 = open(self.maneuver_file, 'r')
         self.flag=0
+        
         for line in file1:
             #Skip lines that are blank or start with
             if (line[0]=='#' or line=='\n'):
                 pass
-            
+
             #### TIME (1)
             #If this phrase is found, set a flag so that the next time around the line is read into the appropriate variables
             #The units for time should be in seconds. TIME=0 when controller is activated
@@ -77,8 +54,8 @@ class read_maneuver_file:
                         sys.exit('Error reading maneuver time!')
                 else:
                     self.flag=1
-        
-            #### THETA (2) [deg]
+
+            #### THETA (2) [deg] - CL
             elif line=='THETA\n' or self.flag==2:
                  if self.flag==2:
                      try:
@@ -89,8 +66,8 @@ class read_maneuver_file:
                         sys.exit('Error reading maneuver pitch angles!')
                  else:
                      self.flag=2
-                         
-            #### PHI (3) [deg]
+
+            #### PHI (3) [deg] - CL
             elif line=='PHI\n' or self.flag==3:
                  if self.flag==3:
                      try:
@@ -102,7 +79,7 @@ class read_maneuver_file:
                  else:
                      self.flag=3
 
-            #### VELOCITY (4) [ft/s]
+            #### VELOCITY (4) [ft/s] - CL
             elif line=='VEL\n' or self.flag==4:
                  if self.flag==4:
                      try:
@@ -116,7 +93,7 @@ class read_maneuver_file:
                  else:
                      self.flag=4
 
-            #### THROTTLE (5) [percentage]
+            #### THROTTLE (5) [percentage] - CL
             elif line=='THR\n' or self.flag==5:
                  if self.flag==5:
                      try:
@@ -129,8 +106,8 @@ class read_maneuver_file:
                         sys.exit('Error reading maneuver throttle!')
                  else:
                      self.flag=5
-                         
-            #### IC_TYPE (6) *See maneuver file for description*
+
+            #### IC_TYPE (6) *See maneuver file for description*  - CL
             elif line=='IC_TYPE\n' or self.flag==6:
                  if self.flag==6:
                      try:
@@ -143,6 +120,42 @@ class read_maneuver_file:
                         sys.exit('Error reading maneuver throttle!')
                  else:
                      self.flag=6
+                        
+            #### ELEVATOR DEFLECTION (7) [deg]  - OL
+            elif line=='DE\n' or self.flag==7:
+                 if self.flag==7:
+                     try:
+                        self.man_elev=[float(s) for s in line.split()]
+                        self.length_check.append(len(self.man_elev))
+                        self.flag=0
+                     except:
+                        sys.exit('Error reading maneuver elevator deflection!')
+                 else:
+                     self.flag=7
+  
+            #### AILERON DEFLECTION (8) [deg]  - OL
+            elif line=='DA\n' or self.flag==8:
+                 if self.flag==8:
+                     try:
+                        self.man_ail=[float(s) for s in line.split()]
+                        self.length_check.append(len(self.man_ail))
+                        self.flag=0
+                     except:
+                        sys.exit('Error reading maneuver aileron deflection!')
+                 else:
+                     self.flag=8
+                        
+            #### RUDDER DEFLECTION (9) [deg]  - OL
+            elif line=='DR\n' or self.flag==9:
+                 if self.flag==9:
+                     try:
+                        self.man_rudd=[float(s) for s in line.split()]
+                        self.length_check.append(len(self.man_rudd))
+                        self.flag=0
+                     except:
+                        sys.exit('Error reading maneuver rudder deflection!')
+                 else:
+                     self.flag=9
 
         ##Check to make sure the length of all maneuver points are equal
         if (all(x == self.length_check[0] for x in self.length_check)==True):
@@ -150,14 +163,15 @@ class read_maneuver_file:
         else:
             sys.exit('Number of maneuver points not equal across states!')
 
-        ##Make sure that first time entry is zero if IC_TYPE=2
-        if self.man_time[0]!=0:
-            sys.exit('First maneuver time entry needs to be zero if IC_TYPE=2!')
+        if (self.self.maneuver_file=='maneuver_CL.txt'):
+            ##Make sure that first time entry is zero if IC_TYPE=2
+            if (IC_TYPE==2 and self.man_time[0]!=0):
+                sys.exit('First maneuver time entry needs to be zero if IC_TYPE=2!')
 
-        ##Change the IC_TYPE to reflect whether velocity or throttle is to be used
-        if self.man_thr[0]==-1:
-            self.ic_type=3
-        elif self.man_vel[0]==-1:
-            self.ic_type=4
-        else:
-            sys.exit('Error occured while assigning IC_TYPE from velocity/throttle!')
+            ##Change the IC_TYPE to reflect whether velocity or throttle is to be used
+            if self.man_thr[0]==-1:
+                self.ic_type=3
+            elif self.man_vel[0]==-1:
+                self.ic_type=4
+            else:
+                sys.exit('Error occured while assigning IC_TYPE from velocity/throttle!')
