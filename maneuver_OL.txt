@@ -1,1 +1,21 @@
-test
+#Preprogrammed maneuver file
+#
+#General format for file is:
+#'Variable'
+#<value value value>
+
+#Time (sec) that states are changed
+TIME
+1 2 3 4 5 6 7 8 9 10 11 12
+
+#Elevator deflection (deg)
+DE
+5 0 -5 0 0 0 0 0 0 0 0 0
+
+#Aileron deflection (deg)
+DA
+0 0 0 0 5 0 -5 0 0 0 0 0
+
+#Rudder deflection (deg)
+DR
+0 0 0 0 0 0 0 0 5 0 -5 0
