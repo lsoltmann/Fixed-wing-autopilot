@@ -136,6 +136,7 @@ def AHRS_process(processEXIT,output_array):
     time.sleep(1)
     g_offset=[0,0,0]
     
+    '''
     # Low pass filter setup
     fc=15; #Hz
     dt_f=0.0011 #measured average (sec)
@@ -143,6 +144,7 @@ def AHRS_process(processEXIT,output_array):
     a_f=2*pie*dt_f*fc/(2*pie*dt_f*fc+1)
     b_f=1-a_f
     first_time=1
+    '''
     
     # Loop to determine gyroscope offsets
     for x in range(0, 100):
@@ -173,6 +175,7 @@ def AHRS_process(processEXIT,output_array):
             az=m9a[2]*0.10197
         att.attitude3(ax,ay,az,gx,gy,gz,m9m[0],m9m[1],m9m[2])
         
+        '''
         # Apply LPF (only for ouput data)
         if first_time==1:
             theta_dot_d=att.thetad_d
@@ -183,14 +186,22 @@ def AHRS_process(processEXIT,output_array):
             theta_dot_d=a_f*att.thetad_d+b_f*theta_dot_d
             phi_dot_d=a_f*att.phid_d+b_f*phi_dot_d
             psi_dot_d=a_f*att.psid_d+b_f*psi_dot_d
+        '''
         
         # Set outputs
         output_array[0]=att.roll_d-output_array[10]  #Subtract offsets due to orientation error
         output_array[1]=att.pitch_d-output_array[11] #Subtract offsets due to orientation error
         output_array[2]=att.yaw_d
-        output_array[3]=psi_dot_d
-        output_array[4]=phi_dot_d
-        output_array[5]=theta_dot_d
+        
+        # If using LPF
+        #output_array[3]=psi_dot_d
+        #output_array[4]=phi_dot_d
+        #output_array[5]=theta_dot_d
+        # If not using LPF
+        output_array[3]=att.psid_d
+        output_array[4]=att.phid_d
+        output_array[5]=att.thetad_d
+        
         output_array[12]=ax
         output_array[13]=ay
         output_array[14]=az
@@ -412,8 +423,8 @@ if (mode>0):
         flt_log.write('# Velocity/Altitude Offsets\n')
         flt_log.write('# %.1f %.0f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
         flt_log.write('\n')
-        flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD\n')
-        flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM\n')
+        flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
+        flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM PWM PWM PWM PWM\n')
     except:
         led.setColor('Red')
         sys.exit('Error creating log file!')
@@ -450,32 +461,43 @@ if (mode>0):
         # ---- Automatic control mode
         elif gear_switch>1500:
             #Get/set initial conditions when switching into auto mode
-            if (auto_at_auto_flag==1 and mode != 1):
-                #Initialize variables
-                count_at_steady_state_pitch=0
-                count_at_steady_state_roll=0
-                count_at_steady_state_vel=0
-                steady_state_condition_achieved_pitch=0
-                steady_state_condition_achieved_roll=0
-                steady_state_condition_achieved_vel=0
-                man_flag=0
-                maneuver_count=1
-                #Get current control surface commands
-                d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
-                #Convert control surface commands to angles
-                d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
+            if auto_at_auto_flag==1:
+                if mode==1:
+                    # Nothing to do if in pass through mode
+                    pass
                 
-                phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data[0])
+                elif mode==2:
+                    # Set flags for stepping through maneuver
+                    man_flag=1
+                    maneuver_count=1
+                    t_man_start=time.time()
+                    
+                elif mode==3:
+                    #Initialize variables
+                    count_at_steady_state_pitch=0
+                    count_at_steady_state_roll=0
+                    count_at_steady_state_vel=0
+                    steady_state_condition_achieved_pitch=0
+                    steady_state_condition_achieved_roll=0
+                    steady_state_condition_achieved_vel=0
+                    man_flag=0
+                    maneuver_count=1
+                    # Get current control surface commands
+                    d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
+                    # Convert control surface commands to angles
+                    d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
+                    # Set initial commands
+                    phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data[0])
+
+                    #Seed controllers
+                    LowLevel.ail_PID.integral_term=d_a_cmd
+                    LowLevel.elev_PID.integral_term=d_e_cmd
                 
-                #Seed controllers
-                LowLevel.ail_PID.integral_term=d_a_cmd
-                LowLevel.elev_PID.integral_term=d_e_cmd
-                
-                #Change flag value (only needs to be one at moment controller is activated
+                #Change flag value (only needs to be active at the moment controller is activated
                 auto_at_auto_flag=0
             
             # PASS THROUGH MODE
-            if (mode==1 or mode==2):
+            if (mode==1):
                 d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
                 d_e_cmd=0
                 d_a_cmd=0
@@ -486,8 +508,22 @@ if (mode>0):
                 psi_cmd=0
                 V_cmd=0
             
-            # <Currently not defined> pass through for now
-            #elif mode==2:
+            # PREPROGRAMMED MANEUVER MODE - OPEN LOOP
+            elif mode==2:
+                t_current=time.time()
+                if (t_current-t_man_start)>=PM.man_time[maneuver_count] and man_flag<2:
+                    # If the current time is equal to (or just barely greater than) the maneuver time, change the target values
+                    d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
+                    d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
+                    d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
+                    d_T_cmd=d_T_pwm #throttle command set to current setting
+                    # Increment count to set next maneuver time
+                    maneuver_count+=1
+                    if maneuver_count>=len(PM.man_time):
+                        man_flag=2
+                else:
+                    # After maneuver is complete, just hold the last command for each control surface
+                    pass
             
             # PREPROGRAMMED MANEUVER MODE - CLOSED LOOP
             elif mode==3:
@@ -573,8 +609,8 @@ if (mode>0):
         t_elapsed=t_2-t_start
         
         if gear_switch>1500:       
-            #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R    AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF ELEV AIL THR RUDD          
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d\n' % (t_elapsed,
+            #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R    AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF E  A  T  R  EC AC TC RC        
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %d %d %d %d\n' % (t_elapsed,
                                                                                                                                                  dt3,
                                                                                                                                                  AHRS_data[0],
                                                                                                                                                  AHRS_data[1],
