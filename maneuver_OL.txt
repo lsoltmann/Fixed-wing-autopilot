@@ -1,8 +1,14 @@
-#Preprogrammed maneuver file
+#Preprogrammed maneuver file for open loop maneuvers
 #
 #General format for file is:
 #'Variable'
 #<value value value>
+
+#Deflection type
+#1=absolute - deflection values used as is
+#2=relative - deflection values added to commanded values at autopilot activation
+DEF_TYPE
+1
 
 #Time (sec) that states are changed
 TIME
