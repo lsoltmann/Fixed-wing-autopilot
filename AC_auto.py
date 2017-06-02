@@ -494,6 +494,9 @@ if (mode>0):
                     d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
                     # Convert control surface commands to angles
                     d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
+                    d_a_at_auto=d_a_cmd
+                    d_e_at_auto=d_e_cmd
+                    d_r_at_auto=d_r_cmd
                     
                 elif mode==3:
                     #Initialize variables
@@ -536,15 +539,15 @@ if (mode>0):
                 t_current=time.time()
                 if (t_current-t_man_start)>=PM.man_time[maneuver_count] and man_flag<2:
                     # If the current time is equal to (or just barely greater than) the maneuver time, change the target values
-                    if PM.def_type==1:
+                    if PM.def_type==1: #Absolute deflection
                         d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
                         d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
                         d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
                         d_T_cmd=0 #throttle command set to current setting
-                    if PM.def_type==2:
-                        d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
-                        d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
-                        d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
+                    if PM.def_type==2: #Relative deflection (maneuver+command at AP activation)
+                        d_e_cmd=PM.man_elev[maneuver_count]+d_e_at_auto #elevator deflection
+                        d_a_cmd=PM.man_ail[maneuver_count]+d_a_at_auto #aileron deflection
+                        d_r_cmd=PM.man_rudd[maneuver_count]+d_r_at_auto #rudder deflection
                         d_T_cmd=0 #throttle command set to current setting
                     # Increment count to set next maneuver time
                     maneuver_count+=1
