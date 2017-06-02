@@ -28,6 +28,7 @@ class read_maneuver_file:
     def __init__(self,maneuver_file):
         self.maneuver_file=maneuver_file
         self.flag=0
+        self.error_flag=0
         self.length_check=[]
 
     def read_file(self):
@@ -51,7 +52,8 @@ class read_maneuver_file:
                         self.length_check.append(len(self.man_time))
                         self.flag=0
                     except:
-                        sys.exit('Error reading maneuver time!')
+                        print('Error reading maneuver time!')
+                        self.error_flag=1
                 else:
                     self.flag=1
 
@@ -63,7 +65,8 @@ class read_maneuver_file:
                         self.length_check.append(len(self.man_theta))
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver pitch angles!')
+                        print('Error reading maneuver pitch angles!')
+                        self.error_flag=1
                  else:
                      self.flag=2
 
@@ -75,7 +78,8 @@ class read_maneuver_file:
                         self.length_check.append(len(self.man_phi))
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver roll angles!')
+                        print('Error reading maneuver roll angles!')
+                        self.error_flag=1
                  else:
                      self.flag=3
 
@@ -89,7 +93,8 @@ class read_maneuver_file:
                             del self.length_check[-1]
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver velocity!')
+                        print('Error reading maneuver velocity!')
+                        self.error_flag=1
                  else:
                      self.flag=4
 
@@ -103,7 +108,8 @@ class read_maneuver_file:
                             del self.length_check[-1]
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver throttle!')
+                        print('Error reading maneuver throttle!')
+                        self.error_flag=1
                  else:
                      self.flag=5
 
@@ -117,7 +123,8 @@ class read_maneuver_file:
                             sys.exit('Invalid input for maneuver IC_TYPE!')
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver throttle!')
+                        print('Error reading maneuver throttle!')
+                        self.error_flag=1
                  else:
                      self.flag=6
                         
@@ -129,7 +136,8 @@ class read_maneuver_file:
                         self.length_check.append(len(self.man_elev))
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver elevator deflection!')
+                        print('Error reading maneuver elevator deflection!')
+                        self.error_flag=1
                  else:
                      self.flag=7
   
@@ -141,7 +149,8 @@ class read_maneuver_file:
                         self.length_check.append(len(self.man_ail))
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver aileron deflection!')
+                        print('Error reading maneuver aileron deflection!')
+                        self.error_flag=1
                  else:
                      self.flag=8
                         
@@ -153,7 +162,8 @@ class read_maneuver_file:
                         self.length_check.append(len(self.man_rudd))
                         self.flag=0
                      except:
-                        sys.exit('Error reading maneuver rudder deflection!')
+                        print('Error reading maneuver rudder deflection!')
+                        self.error_flag=1
                  else:
                      self.flag=9
 
@@ -161,12 +171,14 @@ class read_maneuver_file:
         if (all(x == self.length_check[0] for x in self.length_check)==True):
             pass
         else:
-            sys.exit('Number of maneuver points not equal across states!')
+            print('Number of maneuver points not equal across states!')
+            self.error_flag=1
 
         if (self.maneuver_file=='maneuver_CL.txt'):
             ##Make sure that first time entry is zero if IC_TYPE=2
             if (IC_TYPE==2 and self.man_time[0]!=0):
-                sys.exit('First maneuver time entry needs to be zero if IC_TYPE=2!')
+                print('First maneuver time entry needs to be zero if IC_TYPE=2!')
+                self.error_flag=1
 
             ##Change the IC_TYPE to reflect whether velocity or throttle is to be used
             if self.man_thr[0]==-1:
@@ -174,4 +186,5 @@ class read_maneuver_file:
             elif self.man_vel[0]==-1:
                 self.ic_type=4
             else:
-                sys.exit('Error occured while assigning IC_TYPE from velocity/throttle!')
+                print('Error occured while assigning IC_TYPE from velocity/throttle!')
+                self.error_flag=1
