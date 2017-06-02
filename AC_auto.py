@@ -360,6 +360,20 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
     
     return phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd
 
+def exit_sequence(flag):
+    if flag==1:
+        led.setColor('Red')
+    else:
+        led.setColor('Black')
+        
+    try:
+        flt_log.close()
+    except:
+        pass      
+    exit_flag=1
+    process_EXIT.value=1
+    AHRS_proc.join()
+    ARSP_ALT_proc.join()
 
 ##### MAIN PROGRAM #####
 # Setup LED
@@ -407,10 +421,7 @@ if (mode>0):
     
     # Check to make sure magnetometer is functioning correctly and not reporting all zeros
     if AHRS_data[9]==1.0:
-        led.setColor('Red')
-        exit_flag=1
-        process_EXIT.value=1
-        AHRS_proc.join()
+        exit_sequence(1)
         sys.exit('Magnetometer reading zero!')
 
     # Setup up data log
@@ -427,7 +438,7 @@ if (mode>0):
         flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
         flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg\n')
     except:
-        led.setColor('Red')
+        exit_sequence(1)
         sys.exit('Error creating log file!')
 
     if mode==2 or mode==3:
@@ -436,6 +447,7 @@ if (mode>0):
             PM=read_preprogrammed_maneuver.read_maneuver_file(sys.argv[2])
             PM.read_file()
         except:
+            exit_sequence(1)
             sys.exit('Error processing maneuver file!')
 
 
@@ -606,7 +618,6 @@ if (mode>0):
             gearflag=0
         if ((tgear-prev_tgear)<0.5 and (tgear-prev_tgear)>0) and prev_tgear != 0:
             exit_flag=1
-            process_EXIT.value=1
         
         # Current time 
         t_2=time.time()
@@ -669,11 +680,7 @@ if (mode>0):
 
 # ---------- Exit Sequence ---------- #
 if (mode>0):
-    flt_log.close()
-    led.setColor('Black')
-    AHRS_proc.join()
-    ARSP_ALT_proc.join()
-    #GPS_proc.join()
+    exit_sequence(0)
 
     led.setColor('Red')
     time.sleep(0.1)
