@@ -163,7 +163,7 @@ class read_maneuver_file:
         else:
             sys.exit('Number of maneuver points not equal across states!')
 
-        if (self.self.maneuver_file=='maneuver_CL.txt'):
+        if (self.maneuver_file=='maneuver_CL.txt'):
             ##Make sure that first time entry is zero if IC_TYPE=2
             if (IC_TYPE==2 and self.man_time[0]!=0):
                 sys.exit('First maneuver time entry needs to be zero if IC_TYPE=2!')
