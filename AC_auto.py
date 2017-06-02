@@ -223,6 +223,8 @@ def ARSP_ALT_process(processEXIT,output_array):
     # output_array[6]=Filtered velocity_dot (ft/s)
     # output_array[7]=Filtered altitude_dot [VSI] (ft)
 
+    print('Starting airspeed/altitude process.')
+
     # Create and initialize pressure transducers
     pt=SSC005D.HWSSC(0x28) #Pitot-static, differential
     st=MS5805.MS5805(0x76) #Static, absolute
@@ -446,6 +448,9 @@ if (mode>0):
         try:
             PM=read_preprogrammed_maneuver.read_maneuver_file(sys.argv[2])
             PM.read_file()
+            if PM.error_flag==1:
+                exit_sequence(1)
+                sys.exit('Format problem with maneuver file!')
         except:
             exit_sequence(1)
             sys.exit('Error processing maneuver file!')
@@ -485,6 +490,10 @@ if (mode>0):
                     man_flag=1
                     maneuver_count=1
                     t_man_start=time.time()
+                    # Get current control surface commands which will be held constant until maneuver starts
+                    d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
+                    # Convert control surface commands to angles
+                    d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
                     
                 elif mode==3:
                     #Initialize variables
@@ -527,14 +536,21 @@ if (mode>0):
                 t_current=time.time()
                 if (t_current-t_man_start)>=PM.man_time[maneuver_count] and man_flag<2:
                     # If the current time is equal to (or just barely greater than) the maneuver time, change the target values
-                    d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
-                    d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
-                    d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
-                    d_T_cmd=0 #throttle command set to current setting
+                    if PM.def_type==1:
+                        d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
+                        d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
+                        d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
+                        d_T_cmd=0 #throttle command set to current setting
+                    if PM.def_type==2:
+                        d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
+                        d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
+                        d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
+                        d_T_cmd=0 #throttle command set to current setting
                     # Increment count to set next maneuver time
                     maneuver_count+=1
                     if maneuver_count>=len(PM.man_time):
                         man_flag=2
+                        maneuver_count=1
                 else:
                     # After maneuver is complete, just hold the last command for each control surface
                     pass
