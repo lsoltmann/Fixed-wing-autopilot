@@ -60,6 +60,7 @@ sys.path.append('/home/pi/Navio2/Python/navio')
 
 #import AirLink_serial
 import mpu9250
+import Alpha_Beta_Filter
 import Complementary_Filter2
 import ControlSurface_Calibration
 import Control_LowLevel
@@ -229,9 +230,9 @@ def ARSP_ALT_process(processEXIT,output_array):
     
     # Create tracking filter
     #ALTITUDE
-    h_TF=trackfilt(0.05,0.005)
+    h_TF=Alpha_Beta_Filter.trackfilt(0.05,0.005)
     #AIRSPEED
-    V_TF=trackfilt(0.2,0.005)
+    V_TF=Alpha_Beta_Filter.trackfilt(0.2,0.005)
 
     # Setup the GPIO and set GPIO 17 and 24 low. The NAVDAQ shields contains a 74HC4052DIP multiplexer and both pins low access the pitot-static tube pressure transducer
     GPIO.setmode(GPIO.BCM)
@@ -295,23 +296,23 @@ def check_CLI_inputs():
     
     if len(sys.argv)==1:
         mode=1
-        print('No command line inputs found ... entering pass through mode.')
+        print('No command line inputs found ... entering MODE 1')
     elif len(sys.argv)>1:
         if sys.argv[1]=='1':
             mode=1
-            print('Entering pass through mode.')
+            print('Entering MODE 1: pass through')
         
         elif sys.argv[1]=='2':
             if len(sys.argv)<3:
                 sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
             mode=2
-            print('Entering open loop maneuver mode.')
+            print('Entering MODE 2: preprogrammed open loop maneuver')
         
         elif sys.argv[1]=='3':
             if len(sys.argv)<3:
                 sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
             mode=3
-            print('Entering closed loop maneuver mode.')
+            print('Entering MODE 3: preprogrammed closed loop maneuver')
         
         elif sys.argv[1]=='-1':
             mode=-1
@@ -424,12 +425,13 @@ if (mode>0):
         flt_log.write('# %.1f %.0f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
         flt_log.write('\n')
         flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
-        flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM PWM PWM PWM PWM\n')
+        flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg\n')
     except:
         led.setColor('Red')
         sys.exit('Error creating log file!')
 
-    if mode==3:
+    if mode==2 or mode==3:
+        print('Processing maneuver file.')
         try:
             PM=read_preprogrammed_maneuver.read_maneuver_file(sys.argv[2])
             PM.read_file()
@@ -516,7 +518,7 @@ if (mode>0):
                     d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
                     d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
                     d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
-                    d_T_cmd=d_T_pwm #throttle command set to current setting
+                    d_T_cmd=0 #throttle command set to current setting
                     # Increment count to set next maneuver time
                     maneuver_count+=1
                     if maneuver_count>=len(PM.man_time):
@@ -616,8 +618,7 @@ if (mode>0):
         if gear_switch>1500:       
             #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R
                           #AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF E  A  T  R  EC AC TC RC
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f 
-                          %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %d %d %d %d\n' % (t_elapsed,
+            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f\n' % (t_elapsed,
                                                                                                      dt3,
                                                                                                      AHRS_data[0],
                                                                                                      AHRS_data[1],
@@ -640,7 +641,11 @@ if (mode>0):
                                                                                                      d_e_pwm,
                                                                                                      d_a_pwm,
                                                                                                      d_T_pwm,
-                                                                                                     d_r_pwm))
+                                                                                                     d_r_pwm,
+                                                                                                     d_e_cmd,
+                                                                                                     d_a_cmd,
+                                                                                                     d_T_cmd,
+                                                                                                     d_r_cmd))
 
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
@@ -664,9 +669,7 @@ if (mode>0):
 
 # ---------- Exit Sequence ---------- #
 if (mode>0):
-    if mode==2:
-        flt_log.close()
-
+    flt_log.close()
     led.setColor('Black')
     AHRS_proc.join()
     ARSP_ALT_proc.join()
