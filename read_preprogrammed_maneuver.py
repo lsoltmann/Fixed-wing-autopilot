@@ -120,7 +120,8 @@ class read_maneuver_file:
                         self.ic_type=[float(s) for s in line.split()]
                         self.ic_type=self.ic_type[0]
                         if self.ic_type!=1 or self.ic_type!=2:
-                            sys.exit('Invalid input for maneuver IC_TYPE!')
+                            print('Invalid input for maneuver IC_TYPE!')
+                            self.error_flag=1
                         self.flag=0
                      except:
                         print('Error reading maneuver throttle!')
@@ -166,6 +167,22 @@ class read_maneuver_file:
                         self.error_flag=1
                  else:
                      self.flag=9
+                        
+            #### DEF_TYPE (10) *See maneuver file for description*  - OL
+            elif line=='DEF_TYPE\n' or self.flag==10:
+                 if self.flag==10:
+                     try:
+                        self.def_type=[float(s) for s in line.split()]
+                        self.def_type=self.def_type[0]
+                        if self.def_type!=1 or self.def_type!=2:
+                            print('Invalid input for maneuver DEF_TYPE!')
+                            self.error_flag=1
+                        self.flag=0
+                     except:
+                        print('Error reading maneuver throttle!')
+                        self.error_flag=1
+                 else:
+                     self.flag=10
 
         ##Check to make sure the length of all maneuver points are equal
         if (all(x == self.length_check[0] for x in self.length_check)==True):
