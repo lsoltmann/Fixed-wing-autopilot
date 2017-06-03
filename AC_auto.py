@@ -216,8 +216,8 @@ def AHRS_process(processEXIT,output_array):
 def ARSP_ALT_process(processEXIT,output_array):
     # output_array[0]=Velocity (ft/s)
     # output_array[1]=Altitude (ft)
-    # output_array[2]=Velocity offset (ft/s)
-    # output_array[3]=Altitude offset (ft) - Pressure altitude at initialization location
+    # output_array[2]=Total pressure offset (PSF)
+    # output_array[3]=Static pressure offset (mbar) - Pressure altitude at initialization location
     # output_array[4]=Filtered velocity (ft/s)
     # output_array[5]=Filtered altitude (ft)
     # output_array[6]=Filtered velocity_dot (ft/s)
@@ -245,45 +245,48 @@ def ARSP_ALT_process(processEXIT,output_array):
     
     INIT_SAMP=10
     COUNT=0
+    # Set inital pressures incase the first loop has the 'input/output error'
+    pt_press=0
+    st_press=1013.25
+    
 
     while processEXIT.value==0:
         t1=time.time()
-        pt.readPressure_raw()
-        pt_press=pt.convertPressure(1,5)*5.2023300231 #inH2O to PSF
-        if pt_press>0:
-            # If averaging loop has finished, subtracted the average
-            if COUNT==INIT_SAMP:
-                output_array[0]=(math.sqrt(pt_press*841.4321175))-output_array[2] #Indicated velocity in ft/s (841.43=2/0.0023769)
-            # If averaging loop hasn't finished, don't subtract
-            else:
-                output_array[0]=(math.sqrt(pt_press*841.4321175)) #Indicated velocity in ft/s (841.43=2/0.0023769) 
+        # Read total pressure for airspeed
+        try:
+            pt.readPressure_raw()
+            pt_press=pt.convertPressure(1,5)*5.2023300231 #inH2O to PSF
+        except:
+            # Use the pressure from the last loop
+            pass
+        # Only calculate velocity if the total pressure is greater than the offset, ie. it's positve so the sqrt function doesn't freak out
+        if pt_press>output_array[2]:
+            output_array[0]=(math.sqrt((pt_press-output_array[2])*841.4321175)) #Indicated velocity in ft/s (841.43=2/0.0023769)
         else:
             output_array[0]=0
         
-        st.read_pressure_temperature()
-        st_temp=st.getTemperature_degF()
-        st_press=st.getPressure_mbar()
-        # If averaging loop has finished, subtracted the average
-        if COUNT==INIT_SAMP:
-            output_array[1]=(1.4536645e5-38951.51955*st_press**0.190284)-output_array[3] #Pressure altitude in ft
-        # If averaging loop hasn't finished, don't subtract
-        else:
-            output_array[1]=(1.4536645e5-38951.51955*st_press**0.190284) #Pressure altitude in ft   
+        # Read static pressure for altitude
+        try:
+            st.read_pressure_temperature()
+            st_temp=st.getTemperature_degF()
+            st_press=st.getPressure_mbar()
+        except:
+            # Use the pressure from the last loop
+            pass
+        # Altitude calculation based on standard atmosphere equation
+        output_array[1]=(1.4536645e5-38951.51955*(st_press-output_array[3])**0.190284) #Pressure altitude in ft
         
         # Get loop time for filter
         t2=time.time()
         dt=t2-t1
-        # If averaging loop has finished, run airspeed and altitude through filter
-        if COUNT==INIT_SAMP:
-            output_array[5],output_array[7]=h_TF.track(output_array[1],dt)
-            output_array[4],output_array[6]=V_TF.track(output_array[0],dt)
-        else:
-            pass
+        # Run altitude and airspeed through filter
+        output_array[5],output_array[7]=h_TF.track(output_array[1],dt)
+        output_array[4],output_array[6]=V_TF.track(output_array[0],dt)
     
-        # Find the average velocity and altitude during the first INIT_SAMP samples to use as the velocity transducer offset and ground level altitude offset
+        # Find the average total and static pressure during the first INIT_SAMP samples to use as the transducer offsets
         if COUNT<(INIT_SAMP):
-            output_array[2]=output_array[2]+output_array[0]/INIT_SAMP #Average velocity offset
-            output_array[3]=output_array[3]+output_array[1]/INIT_SAMP #Average altitude offset
+            output_array[2]=output_array[2]+pt_press/INIT_SAMP #Average total pressure offset
+            output_array[3]=output_array[3]+ps_press/INIT_SAMP #Average static pressure offset
             COUNT=COUNT+1
 
     # Clean up the GPIO before ending the process
@@ -419,6 +422,7 @@ if (mode>0):
     LowLevel=Control_LowLevel.LL_controls()
     MidLevel=Control_MidLevel.ML_controls()
     
+    # Wait for all subprocesses to startup and get through initialization
     time.sleep(3)
     
     # Check to make sure magnetometer is functioning correctly and not reporting all zeros
@@ -434,8 +438,8 @@ if (mode>0):
         flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
         flt_log.write('# '+log_timestr2+' local time')
         flt_log.write('\n\n')
-        flt_log.write('# Velocity/Altitude Offsets\n')
-        flt_log.write('# %.1f %.0f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
+        flt_log.write('# Total and static pressure offsets\n')
+        flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
         flt_log.write('\n')
         flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
         flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg\n')
