@@ -210,7 +210,7 @@ def AHRS_process(processEXIT,output_array):
         output_array[16]=gy
         output_array[17]=gz
     
-    return None
+    print('AHRS process stopped.')
 
 # Subprocess for pressure transducers
 def ARSP_ALT_process(processEXIT,output_array):
@@ -288,7 +288,7 @@ def ARSP_ALT_process(processEXIT,output_array):
 
     # Clean up the GPIO before ending the process
     GPIO.cleanup()
-
+    print('Airspeed/altitude process stopped.')
 
 def check_CLI_inputs():
     #Modes:
@@ -488,7 +488,7 @@ if (mode>0):
                 elif mode==2:
                     # Set flags for stepping through maneuver
                     man_flag=1
-                    maneuver_count=1
+                    maneuver_count=0
                     t_man_start=time.time()
                     # Get current control surface commands which will be held constant until maneuver starts
                     d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
@@ -507,7 +507,7 @@ if (mode>0):
                     steady_state_condition_achieved_roll=0
                     steady_state_condition_achieved_vel=0
                     man_flag=0
-                    maneuver_count=1
+                    maneuver_count=0
                     # Get current control surface commands
                     d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
                     # Convert control surface commands to angles
@@ -553,7 +553,7 @@ if (mode>0):
                     maneuver_count+=1
                     if maneuver_count>=len(PM.man_time):
                         man_flag=2
-                        maneuver_count=1
+                        maneuver_count=0
                 else:
                     # After maneuver is complete, just hold the last command for each control surface
                     pass
