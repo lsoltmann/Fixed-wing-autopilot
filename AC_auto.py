@@ -227,8 +227,8 @@ def ARSP_ALT_process(processEXIT,output_array):
 
     # Create and initialize pressure transducers
     pt=SSC005D.HWSSC(0x28) #Pitot-static, differential
-    st=MS5805.MS5805(0x76) #Static, absolute
-    st.initialize()
+    ps=MS5805.MS5805(0x76) #Static, absolute
+    ps.initialize()
     
     # Create tracking filter
     #ALTITUDE
@@ -247,7 +247,7 @@ def ARSP_ALT_process(processEXIT,output_array):
     COUNT=0
     # Set inital pressures incase the first loop has the 'input/output error'
     pt_press=0
-    st_press=1013.25
+    ps_press=1013.25
     
 
     while processEXIT.value==0:
@@ -258,7 +258,7 @@ def ARSP_ALT_process(processEXIT,output_array):
             pt_press=pt.convertPressure(1,5)*5.2023300231 #inH2O to PSF
         except:
             # Use the pressure from the last loop
-            pass
+            print('Total pressure read error!')
         # Only calculate velocity if the total pressure is greater than the offset, ie. it's positve so the sqrt function doesn't freak out
         if pt_press>output_array[2]:
             output_array[0]=(math.sqrt((pt_press-output_array[2])*841.4321175)) #Indicated velocity in ft/s (841.43=2/0.0023769)
@@ -267,14 +267,14 @@ def ARSP_ALT_process(processEXIT,output_array):
         
         # Read static pressure for altitude
         try:
-            st.read_pressure_temperature()
-            st_temp=st.getTemperature_degF()
-            st_press=st.getPressure_mbar()
+            ps.read_pressure_temperature()
+            ps_temp=ps.getTemperature_degF()
+            ps_press=ps.getPressure_mbar()
         except:
             # Use the pressure from the last loop
-            pass
+            print('Static pressure read error!')
         # Altitude calculation based on standard atmosphere equation
-        output_array[1]=(1.4536645e5-38951.51955*(st_press-output_array[3])**0.190284) #Pressure altitude in ft
+        output_array[1]=(1.4536645e5-38951.51955*(ps_press)**0.190284) #Pressure altitude in ft
         
         # Get loop time for filter
         t2=time.time()
@@ -439,6 +439,7 @@ if (mode>0):
         flt_log.write('# '+log_timestr2+' local time')
         flt_log.write('\n\n')
         flt_log.write('# Total and static pressure offsets\n')
+        flt_log.write('# PSF mbar\n')
         flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
         flt_log.write('\n')
         flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
