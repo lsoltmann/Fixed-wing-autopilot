@@ -8,7 +8,7 @@
 #1=absolute - deflection values used as is
 #2=relative - deflection values added to commanded values at autopilot activation
 DEF_TYPE
-1
+2
 
 #Time (sec) that states are changed
 TIME

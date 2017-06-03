@@ -119,7 +119,7 @@ class read_maneuver_file:
                      try:
                         self.ic_type=[float(s) for s in line.split()]
                         self.ic_type=self.ic_type[0]
-                        if self.ic_type!=1 or self.ic_type!=2:
+                        if (self.ic_type!=1 and  self.ic_type!=2):
                             print('Invalid input for maneuver IC_TYPE!')
                             self.error_flag=1
                         self.flag=0
@@ -174,7 +174,7 @@ class read_maneuver_file:
                      try:
                         self.def_type=[float(s) for s in line.split()]
                         self.def_type=self.def_type[0]
-                        if self.def_type!=1 or self.def_type!=2:
+                        if self.def_type!=1 and self.def_type!=2:
                             print('Invalid input for maneuver DEF_TYPE!')
                             self.error_flag=1
                         self.flag=0
