@@ -81,6 +81,9 @@ prev_tgear=0
 tgear=0
 gearflag=0
 
+# Create flight log (1) or not (0)
+FLTLOG=0
+
 ## VARIABLE DEFINITIONS ##
 ORIENTATION=5
 
@@ -324,7 +327,7 @@ def check_CLI_inputs():
             print('Entering calibration mode.')
         
         else:
-            led.setColor('Red')
+            exit_sequence(1)
             sys.exit('Unknown input argument!')
     return mode
 
@@ -368,9 +371,10 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
 def exit_sequence(flag):
     if flag==1:
         led.setColor('Red')
+        set_ext_LED('Red')
     else:
         led.setColor('Black')
-        
+        set_ext_LED('Black')
     try:
         flt_log.close()
     except:
@@ -380,10 +384,37 @@ def exit_sequence(flag):
     AHRS_proc.join()
     ARSP_ALT_proc.join()
 
+def set_ext_LED(color):
+    # Set exterior LED to black
+    rcou7.set_duty_cycle(0)
+    rcou8.set_duty_cycle(0)
+    rcou9.set_duty_cycle(0)
+    
+    if color=='Green':
+        rcou8.set_duty_cycle(2)
+    elif color=='Red':
+        rcou7.set_duty_cycle(2)
+    elif color=='Blue':
+        rcou9.set_duty_cycle(2)
+    elif color=='Cyan':
+        rcou8.set_duty_cycle(2)
+        rcou9.set_duty_cycle(2)
+    elif color=='Yellow':
+        rcou7.set_duty_cycle(2)
+        rcou8.set_duty_cycle(2)
+    elif color=='White':
+        rcou7.set_duty_cycle(2)
+        rcou8.set_duty_cycle(2)
+        rcou9.set_duty_cycle(2)
+    elif color=='Black':
+        pass
+    else:
+        pass
+
 ##### MAIN PROGRAM #####
 # Setup LED
 led=leds.Led()
-led.setColor('Yellow')
+
 # Read command line inputs during program excecution and direct program accordingly
 mode=check_CLI_inputs()
 
@@ -393,10 +424,23 @@ rcou1=pwm.PWM(0)
 rcou2=pwm.PWM(1)
 rcou3=pwm.PWM(2)
 rcou4=pwm.PWM(3)
+# Setup external status LED
+rcou7=pwm.PWM(6)
+rcou8=pwm.PWM(7)
+rcou9=pwm.PWM(8)
+
+# Setup PWM frequencies
 rcou1.set_period(50) #Hz
 rcou2.set_period(50)
 rcou3.set_period(50)
 rcou4.set_period(50)
+rcou7.set_period(50)
+rcou8.set_period(50)
+rcou9.set_period(50)
+
+# Set LED
+led.setColor('Yellow')
+set_ext_LED('Yellow')
 
 # NORMAL OPERATION
 if (mode>0):
@@ -468,6 +512,7 @@ if (mode>0):
     count=0 # Used for reduced frame rate output to screen
     auto_at_auto_flag=1
     led.setColor('Cyan')
+    set_ext_LED('Cyan')
     dt3=0
     
     while exit_flag==0:
@@ -707,36 +752,53 @@ if (mode>0):
     exit_sequence(0)
 
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Red')
+    set_ext_LED('Red')
     time.sleep(0.1)
     led.setColor('Blue')
+    set_ext_LED('Blue')
     time.sleep(0.1)
     led.setColor('Black')
+    set_ext_LED('Black')
     print('Done.')
