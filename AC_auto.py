@@ -400,7 +400,7 @@ def set_ext_LED(color):
         rcou8.set_duty_cycle(2)
         rcou9.set_duty_cycle(2)
     elif color=='Yellow':
-        rcou7.set_duty_cycle(2)
+        rcou7.set_duty_cycle(10)
         rcou8.set_duty_cycle(2)
     elif color=='White':
         rcou7.set_duty_cycle(2)
