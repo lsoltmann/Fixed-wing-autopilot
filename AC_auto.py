@@ -225,6 +225,7 @@ def ARSP_ALT_process(processEXIT,output_array):
     # output_array[5]=Filtered altitude (ft)
     # output_array[6]=Filtered velocity_dot (ft/s)
     # output_array[7]=Filtered altitude_dot [VSI] (ft)
+    # output_array[8]=Static pressure transducer temperature (degF)
 
     print('Starting airspeed/altitude process.')
 
@@ -278,6 +279,7 @@ def ARSP_ALT_process(processEXIT,output_array):
             print('Static pressure read error!')
         # Altitude calculation based on standard atmosphere equation
         output_array[1]=(1.4536645e5-38951.51955*(ps_press)**0.190284) #Pressure altitude in ft
+        output_array[8]=ps_temp
         
         # Get loop time for filter
         t2=time.time()
@@ -448,7 +450,7 @@ if (mode>0):
     ## Subprocesses
     # Subprocess array for AHRS and pressure transducer data
     AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,phi_offset,theta_offset,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
-    ARSP_ALT_data=Array('d',[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+    ARSP_ALT_data=Array('d',[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
     
     # Subprocess value that sets exit flag
     process_EXIT=Value('i', 0)
@@ -487,8 +489,8 @@ if (mode>0):
             flt_log.write('# PSF mbar\n')
             flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
             flt_log.write('\n')
-            flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
-            flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg\n')
+            flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD AV_BAY_TEMP\n')
+            flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg degF\n')
         except:
             exit_sequence(1)
             sys.exit('Error creating log file!')
@@ -700,9 +702,8 @@ if (mode>0):
         
         if FLTLOG==1:
             if gear_switch>1500:       
-                #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R
-                              #AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF E  A  T  R  EC AC TC RC
-                flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f\n' % (t_elapsed,
+                #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R   AX   AY   AZ   IAS  ALT  IASF ALTF VACF VSIF E  A  T  R  EC   AC   TC RC   DEGF
+                flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f %.1f\n' % (t_elapsed,
                                                                                                          dt3,
                                                                                                          AHRS_data[0],
                                                                                                          AHRS_data[1],
@@ -729,7 +730,8 @@ if (mode>0):
                                                                                                          d_e_cmd,
                                                                                                          d_a_cmd,
                                                                                                          d_T_cmd,
-                                                                                                         d_r_cmd))
+                                                                                                         d_r_cmd,
+                                                                                                         ARSP_ALT_data[8]))
         else:
             pass
         
