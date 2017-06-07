@@ -475,23 +475,26 @@ if (mode>0):
         sys.exit('Magnetometer reading zero!')
 
     # Setup up data log
-    print('Setting up flight log.')
-    try:
-        log_timestr = time.strftime("%d%m%Y-%H%M")
-        log_timestr2= time.asctime()
-        flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
-        flt_log.write('# '+log_timestr2+' local time')
-        flt_log.write('\n\n')
-        flt_log.write('# Total and static pressure offsets\n')
-        flt_log.write('# PSF mbar\n')
-        flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
-        flt_log.write('\n')
-        flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
-        flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg\n')
-    except:
-        exit_sequence(1)
-        sys.exit('Error creating log file!')
-
+    if FLTLOG==1:
+        print('Setting up flight log.')
+        try:
+            log_timestr = time.strftime("%d%m%Y-%H%M")
+            log_timestr2= time.asctime()
+            flt_log=open('flight_log_'+log_timestr+'.txt', 'w')
+            flt_log.write('# '+log_timestr2+' local time')
+            flt_log.write('\n\n')
+            flt_log.write('# Total and static pressure offsets\n')
+            flt_log.write('# PSF mbar\n')
+            flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
+            flt_log.write('\n')
+            flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD\n')
+            flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg\n')
+        except:
+            exit_sequence(1)
+            sys.exit('Error creating log file!')
+    else:
+        pass
+            
     if mode==2 or mode==3:
         print('Processing maneuver file.')
         try:
@@ -695,38 +698,41 @@ if (mode>0):
         # Time since script was started
         t_elapsed=t_2-t_start
         
-        if gear_switch>1500:       
-            #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R
-                          #AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF E  A  T  R  EC AC TC RC
-            flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f\n' % (t_elapsed,
-                                                                                                     dt3,
-                                                                                                     AHRS_data[0],
-                                                                                                     AHRS_data[1],
-                                                                                                     AHRS_data[2],
-                                                                                                     AHRS_data[4],
-                                                                                                     AHRS_data[5],
-                                                                                                     AHRS_data[3],
-                                                                                                     AHRS_data[15],
-                                                                                                     AHRS_data[16],
-                                                                                                     AHRS_data[17],
-                                                                                                     AHRS_data[12],
-                                                                                                     AHRS_data[13],
-                                                                                                     AHRS_data[14],
-                                                                                                     ARSP_ALT_data[0],
-                                                                                                     ARSP_ALT_data[1],
-                                                                                                     ARSP_ALT_data[4],
-                                                                                                     ARSP_ALT_data[5],
-                                                                                                     ARSP_ALT_data[6],
-                                                                                                     ARSP_ALT_data[7],
-                                                                                                     d_e_pwm,
-                                                                                                     d_a_pwm,
-                                                                                                     d_T_pwm,
-                                                                                                     d_r_pwm,
-                                                                                                     d_e_cmd,
-                                                                                                     d_a_cmd,
-                                                                                                     d_T_cmd,
-                                                                                                     d_r_cmd))
-
+        if FLTLOG==1:
+            if gear_switch>1500:       
+                #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R
+                              #AX   AY   AZ   IAS  ALT IASF ALTF VACF VSIF E  A  T  R  EC AC TC RC
+                flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f\n' % (t_elapsed,
+                                                                                                         dt3,
+                                                                                                         AHRS_data[0],
+                                                                                                         AHRS_data[1],
+                                                                                                         AHRS_data[2],
+                                                                                                         AHRS_data[4],
+                                                                                                         AHRS_data[5],
+                                                                                                         AHRS_data[3],
+                                                                                                         AHRS_data[15],
+                                                                                                         AHRS_data[16],
+                                                                                                         AHRS_data[17],
+                                                                                                         AHRS_data[12],
+                                                                                                         AHRS_data[13],
+                                                                                                         AHRS_data[14],
+                                                                                                         ARSP_ALT_data[0],
+                                                                                                         ARSP_ALT_data[1],
+                                                                                                         ARSP_ALT_data[4],
+                                                                                                         ARSP_ALT_data[5],
+                                                                                                         ARSP_ALT_data[6],
+                                                                                                         ARSP_ALT_data[7],
+                                                                                                         d_e_pwm,
+                                                                                                         d_a_pwm,
+                                                                                                         d_T_pwm,
+                                                                                                         d_r_pwm,
+                                                                                                         d_e_cmd,
+                                                                                                         d_a_cmd,
+                                                                                                         d_T_cmd,
+                                                                                                         d_r_cmd))
+        else:
+            pass
+        
         #If loop time was less than autopilot loop time, sleep the remaining time
         t_3=time.time()
         dt2=t_3-t_1
