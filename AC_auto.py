@@ -378,6 +378,29 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
     
     return phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd
 
+## READ THE CONTROL MAPPING CALIBRATION FILE
+def read_calibration_file():
+    #Open the config file
+    CM=[0]*9 #ControlMapping
+    try:
+        CMF = open('ControlMapping.txt, 'r')
+        data_uf=CMF.read()
+        data=[float(s) for s in data_uf.split()]
+        CM[0]=data[16] #Rm
+        CM[1]=data[17] #Rbl
+        CM[2]=data[18] #Rbh
+        CM[3]=data[19] #Pm
+        CM[4]=data[20] #Pbl
+        CM[5]=data[21] #Pbh
+        CM[6]=data[22] #Ym
+        CM[7]=data[23] #Ybl
+        CM[8]=data[24] #Ybh
+        CMF.close()
+        return CM
+    except:
+        exit_sequence(1)
+        sys.exit('Error reading control mapping file!')
+
 def exit_sequence(flag):
     if flag==1:
         led.setColor('Red')
