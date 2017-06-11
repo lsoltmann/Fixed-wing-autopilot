@@ -326,11 +326,11 @@ def check_CLI_inputs():
         
         elif sys.argv[1]=='-1':
             if len(sys.argv)<5:
-                print('Usage: sudo python3 AC_auto.py pitch roll rudd dead_band')
+                print('Usage: sudo python3 AC_auto.py -1 pitch roll rudd dead_band')
                 print('    pitch = abs(maximum pitch angle) [deg]')
                 print('     roll = abs(maximum roll angle) [deg]')
                 print('     rudd = abs(maximum rudder angle) [deg]')
-                print('dead_band = window around neutral for zero command [u_sec]
+                print('dead_band = window around neutral for zero command [u_sec]')
                 print('All values should be entered as integers')
                 sys.exit('** Not enough inputs! **')
             mode=-1
@@ -770,11 +770,17 @@ if (mode>0):
 # in this mode the PWM to pitch/roll/yaw curves are determined based on the user input file
 elif mode==-1:
     led.setColor('Black')
-    set_ext_LED('Black')
+    #set_ext_LED('Black')
+
+    # Intialize PWM array
+    RCinput=[0]*4
+
     print('CONTROL CALIBRATION MODE')
     print(' ')
     print('Step 1: Determine center points.')
     print('        Do not move sticks for 5 seconds.')
+    print(' ')
+    print(' ** Set gear switch to AUTO mode before proceeding! **')
     print(' ')
     dummy=input('Press RETURN to start ')
     print(' ')
@@ -858,23 +864,23 @@ elif mode==-1:
         t2=time.time()
         x=t2-t1
 
+    max_p=int(sys.argv[2])
+    max_r=int(sys.argv[3])
+    max_rud=int(sys.argv[4])
+    dead_band=int(sys.argv[5])
+
     print('Channel max and mins values collected (uS)')
     print('     Ch0   Ch1   Ch2   Ch3')
     print('MIN: %d  %d  %d  %d' % (MIN_PWM[0],MIN_PWM[1],MIN_PWM[2],MIN_PWM[3]))
     print('MAX: %d  %d  %d  %d' % (MAX_PWM[0],MAX_PWM[1],MAX_PWM[2],MAX_PWM[3]))
     print(' ')
     print('Determining slopes and intercepts based on:')
-    print('    Pitch limit (deg):  %d' % sys.argv[2])
-    print('    Roll limit (deg):   %d' % sys.argv[3])
-    print('    Rudder limit (deg): %d' % sys.argv[4])
-    print('    Dead band (uS):     %d' % sys.argv[5])
+    print('    Pitch limit (deg):  %d' % max_p)
+    print('    Roll limit (deg):   %d' % max_r)
+    print('    Rudder limit (deg): %d' % max_rud)
+    print('    Dead band (uS):     %d' % dead_band)
     print(' ')
                       
-    max_p=sys.argv[2]
-    max_r=sys.argv[3]
-    max_rud=sys.argv[4]
-    dead_band=sys.argv[5]
-
     # PITCH
     # Determine slopes and intercepts
     mp_H=-max_p/(-MAX_PWM[1]+c1+dead_band)
@@ -920,10 +926,10 @@ elif mode==-1:
         by_H2=-my_L*(c3+dead_band)
         PTA_Y=[my_L,by_L,by_H2]
 
-    print('Slopes and intercepts for roll, pitch, and rudder')
-    print('PTA_R = %.3f %.3f %.3f' % (PTA_R[0],PTA_R[1],PTA_R[2]))
-    print('PTA_P = %.3f %.3f %.3f' % (PTA_P[0],PTA_P[1],PTA_P[2]))
-    print('PTA_Y = %.3f %.3f %.3f' % (PTA_Y[0],PTA_Y[1],PTA_Y[2]))
+    print('Slopes and intercepts for roll, pitch, and rudder control stick  PWM to target angle')
+    print('Roll   = %.3f %.3f %.3f' % (PTA_R[0],PTA_R[1],PTA_R[2]))
+    print('Pitch  = %.3f %.3f %.3f' % (PTA_P[0],PTA_P[1],PTA_P[2]))
+    print('Rudder = %.3f %.3f %.3f' % (PTA_Y[0],PTA_Y[1],PTA_Y[2]))
     print(' ')
 
     calib=open('ControlMapping.txt', 'w')
