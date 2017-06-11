@@ -325,8 +325,16 @@ def check_CLI_inputs():
             print('Entering MODE 3: preprogrammed closed loop maneuver')
         
         elif sys.argv[1]=='-1':
+            if len(sys.argv)<5:
+                print('Usage: sudo python3 AC_auto.py pitch roll rudd dead_band')
+                print('    pitch = abs(maximum pitch angle) [deg]')
+                print('     roll = abs(maximum roll angle) [deg]')
+                print('     rudd = abs(maximum rudder angle) [deg]')
+                print('dead_band = window around neutral for zero command [u_sec]
+                print('All values should be entered as integers')
+                sys.exit('** Not enough inputs! **')
             mode=-1
-            print('Entering calibration mode.')
+            print('Entering control mapping calibration mode.')
         
         else:
             exit_sequence(1)
@@ -420,32 +428,34 @@ led=leds.Led()
 # Read command line inputs during program excecution and direct program accordingly
 mode=check_CLI_inputs()
 
-# Setup RCinput and RCoutput
+# Setup RCinput
 rcin=rcinput.RCInput()
-rcou1=pwm.PWM(0)
-rcou2=pwm.PWM(1)
-rcou3=pwm.PWM(2)
-rcou4=pwm.PWM(3)
-# Setup external status LED
-rcou7=pwm.PWM(6)
-rcou8=pwm.PWM(7)
-rcou9=pwm.PWM(8)
-
-# Setup PWM frequencies
-rcou1.set_period(50) #Hz
-rcou2.set_period(50)
-rcou3.set_period(50)
-rcou4.set_period(50)
-rcou7.set_period(50)
-rcou8.set_period(50)
-rcou9.set_period(50)
-
-# Set LED
-led.setColor('Yellow')
-set_ext_LED('Yellow')
 
 # NORMAL OPERATION
 if (mode>0):
+    # Setup PWM outputs for controls
+    rcou1=pwm.PWM(0)
+    rcou2=pwm.PWM(1)
+    rcou3=pwm.PWM(2)
+    rcou4=pwm.PWM(3)
+ 
+    # Setup external status LED
+    rcou7=pwm.PWM(6)
+    rcou8=pwm.PWM(7)
+    rcou9=pwm.PWM(8)
+
+    # Setup PWM frequencies
+    rcou1.set_period(50) #Hz
+    rcou2.set_period(50)
+    rcou3.set_period(50)
+    rcou4.set_period(50)
+    rcou7.set_period(50)
+    rcou8.set_period(50)
+    rcou9.set_period(50)
+
+    # Set LED
+    led.setColor('Yellow')
+    set_ext_LED('Yellow')
     
     ## Subprocesses
     # Subprocess array for AHRS and pressure transducer data
@@ -754,6 +764,181 @@ if (mode>0):
             #count=0
         #print(ARSP_ALT_data[0])
         #print(ARSP_ALT_data[1])
+        
+# ---------- Calibration Modes ---------- #
+# CONTROL CALIBRATION MODE
+# in this mode the PWM to pitch/roll/yaw curves are determined based on the user input file
+elif mode==-1:
+    led.setColor('Black')
+    set_ext_LED('Black')
+    print('CONTROL CALIBRATION MODE')
+    print(' ')
+    print('Step 1: Determine center points.')
+    print('        Do not move sticks for 5 seconds.')
+    print(' ')
+    dummy=input('Press RETURN to start ')
+    print(' ')
+    print('Determining center points...')
+    print(' ')
+    CENTER_PWM=[0,0,0,0]
+    t1=time.time()
+    x=0.0
+    i=1
+    while x<5.0:
+        # Get inputs from the receiver
+        # Definition is based of Assan X8R6
+        RCinput[0]=float(rcin.read(1))
+        RCinput[1]=float(rcin.read(2))
+        RCinput[2]=float(rcin.read(0))
+        RCinput[3]=float(rcin.read(3))
+        
+        if i==1:
+            c0=RCinput[0]
+            c1=RCinput[1]
+            c2=RCinput[2]
+            c3=RCinput[3]
+        else:
+            c0=c0+(RCinput[0]-c0)/(i+1)
+            c1=c1+(RCinput[1]-c1)/(i+1)
+            c2=c2+(RCinput[2]-c2)/(i+1)
+            c3=c3+(RCinput[3]-c3)/(i+1)
+
+        i=i+1
+        t2=time.time()
+        x=t2-t1
+            
+    c0=int(c0)
+    c1=int(c1)
+    c2=int(c2)
+    c3=int(c3)
+    print('Average center points found to be (uS)')
+    print('Ch0   Ch1   Ch2   Ch3')
+    print('%d  %d  %d  %d' % (c0,c1,c2,c3))
+    print(' ')
+    print(' ')
+    print('Step 2: Determine maximum and minimum PWM values from the RX.')
+    print('        Move all sticks to their extremes within 10 seconds')
+    print(' ')
+    dummy=input('Press RETURN to start ')
+    print(' ')
+    print('Determining max and min PWM values...')
+    print(' ')
+    MAX_PWM=[1500,1500,1500,1500]
+    MIN_PWM=[1500,1500,1500,1500]
+    t1=time.time()
+    x=0.0
+    while x<10.0:
+        # Get inputs from the receiver and save the max and min values
+        # Definition is based of Assan X8R6
+        RCinput[0]=float(rcin.read(1))
+        RCinput[1]=float(rcin.read(2))
+        RCinput[2]=float(rcin.read(0))
+        RCinput[3]=float(rcin.read(3))
+
+        if RCinput[0]>MAX_PWM[0]:
+            MAX_PWM[0]=RCinput[0]
+        if RCinput[0]<MIN_PWM[0]:
+            MIN_PWM[0]=RCinput[0]
+        
+        if RCinput[1]>MAX_PWM[1]:
+            MAX_PWM[1]=RCinput[1]
+        if RCinput[1]<MIN_PWM[1]:
+            MIN_PWM[1]=RCinput[1]
+        
+        if RCinput[2]>MAX_PWM[2]:
+            MAX_PWM[2]=RCinput[2]
+        if RCinput[2]<MIN_PWM[2]:
+            MIN_PWM[2]=RCinput[2]
+        
+        if RCinput[3]>MAX_PWM[3]:
+            MAX_PWM[3]=RCinput[3]
+        if RCinput[3]<MIN_PWM[3]:
+            MIN_PWM[3]=RCinput[3]
+
+        t2=time.time()
+        x=t2-t1
+
+    print('Channel max and mins values collected (uS)')
+    print('     Ch0   Ch1   Ch2   Ch3')
+    print('MIN: %d  %d  %d  %d' % (MIN_PWM[0],MIN_PWM[1],MIN_PWM[2],MIN_PWM[3]))
+    print('MAX: %d  %d  %d  %d' % (MAX_PWM[0],MAX_PWM[1],MAX_PWM[2],MAX_PWM[3]))
+    print(' ')
+    print('Determining slopes and intercepts based on:')
+    print('    Pitch limit (deg):  %d' % sys.argv[2])
+    print('    Roll limit (deg):   %d' % sys.argv[3])
+    print('    Rudder limit (deg): %d' % sys.argv[4])
+    print('    Dead band (uS):     %d' % sys.argv[5])
+    print(' ')
+                      
+    max_p=sys.argv[2]
+    max_r=sys.argv[3]
+    max_rud=sys.argv[4]
+    dead_band=sys.argv[5]
+
+    # PITCH
+    # Determine slopes and intercepts
+    mp_H=-max_p/(-MAX_PWM[1]+c1+dead_band)
+    bp_H=(c1+dead_band)*max_p/(-MAX_PWM[1]+c1+dead_band)
+    mp_L=max_p/(-MIN_PWM[1]+c1-dead_band)
+    bp_L=-(c1-dead_band)*max_p/(-MIN_PWM[1]+c1-dead_band)
+
+    # Find out which one is smaller and then compile the appropriate slope and intercepts
+    if mp_H<=mp_L:
+        bp_L2=-mp_H*(c1-dead_band)
+        PTA_P=[mp_H,bp_L2,bp_H]
+    elif mp_H>mp_L:
+        bp_H2=-mp_L*(c1+dead_band)
+        PTA_P=[mp_L,bp_L,bp_H2]
+
+    # ROLL
+    # Determine slopes and intercepts
+    mr_H=-max_r/(-MAX_PWM[0]+c0+dead_band)
+    br_H=(c0+dead_band)*max_r/(-MAX_PWM[0]+c0+dead_band)
+    mr_L=max_r/(-MIN_PWM[0]+c0-dead_band)
+    br_L=-(c0-dead_band)*max_r/(-MIN_PWM[0]+c0-dead_band)
+
+    # Find out which one is smaller and then compile the appropriate slope and intercepts
+    if mr_H<=mr_L:
+        br_L2=-mr_H*(c0-dead_band)
+        PTA_R=[mr_H,br_L2,br_H]
+    elif mr_H>mr_L:
+        br_H2=-mr_L*(c0+dead_band)
+        PTA_R=[mr_L,br_L,br_H2]
+
+    # YAW
+    # Determine slopes and intercepts
+    my_H=-max_rud/(-MAX_PWM[3]+c3+dead_band)
+    by_H=(c3+dead_band)*max_rud/(-MAX_PWM[3]+c3+dead_band)
+    my_L=max_rud/(-MIN_PWM[3]+c3-dead_band)
+    by_L=-(c3-dead_band)*max_rud/(-MIN_PWM[3]+c3-dead_band)
+
+    # Find out which one is smaller and then compile the appropriate slope and intercepts
+    if my_H<=my_L:
+        by_L2=-my_H*(c3-dead_band)
+        PTA_Y=[my_H,by_L2,by_H]
+    elif my_H>my_L:
+        by_H2=-my_L*(c3+dead_band)
+        PTA_Y=[my_L,by_L,by_H2]
+
+    print('Slopes and intercepts for roll, pitch, and rudder')
+    print('PTA_R = %.3f %.3f %.3f' % (PTA_R[0],PTA_R[1],PTA_R[2]))
+    print('PTA_P = %.3f %.3f %.3f' % (PTA_P[0],PTA_P[1],PTA_P[2]))
+    print('PTA_Y = %.3f %.3f %.3f' % (PTA_Y[0],PTA_Y[1],PTA_Y[2]))
+    print(' ')
+
+    calib=open('ControlMapping.txt', 'w')
+    calib.write('%d %d %d %d\n' % (max_r,max_p,max_rud,dead_band))
+    calib.write('%d %d %d %d\n' % (c0,c1,c2,c3))
+    calib.write('%d %d %d %d\n' % (MIN_PWM[0],MIN_PWM[1],MIN_PWM[2],MIN_PWM[3]))
+    calib.write('%d %d %d %d\n' % (MAX_PWM[0],MAX_PWM[1],MAX_PWM[2],MAX_PWM[3]))
+    calib.write('%.4f %.4f %.4f\n' % (PTA_R[0],PTA_R[1],PTA_R[2]))
+    calib.write('%.4f %.4f %.4f\n' % (PTA_P[0],PTA_P[1],PTA_P[2]))
+    calib.write('%.4f %.4f %.4f' % (PTA_Y[0],PTA_Y[1],PTA_Y[2]))
+    calib.close()
+
+    print('Control calibration complete and calibration file written.')
+    print(' ')
+    print('Done.')
 
 # ---------- Exit Sequence ---------- #
 if (mode>0):
