@@ -233,6 +233,7 @@ def ARSP_ALT_process(processEXIT,output_array):
     pt=SSC005D.HWSSC(0x28) #Pitot-static, differential
     ps=MS5805.MS5805(0x76) #Static, absolute
     ps.initialize()
+    time.sleep(1)
     
     # Create tracking filter
     #ALTITUDE
@@ -383,7 +384,7 @@ def read_calibration_file():
     #Open the config file
     CM=[0]*9 #ControlMapping
     try:
-        CMF = open('ControlMapping.txt, 'r')
+        CMF = open('ControlMapping.txt', 'r')
         data_uf=CMF.read()
         data=[float(s) for s in data_uf.split()]
         CM[0]=data[16] #Rm
