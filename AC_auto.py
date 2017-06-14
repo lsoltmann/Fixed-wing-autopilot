@@ -272,7 +272,7 @@ def ARSP_ALT_process(processEXIT,output_array):
         # If an IOerror (or any other error) occurs, reset the I2C bus by calling the i2cdetect ... this appears to be workaround from many forums
         except:
             print('Error reading from I2C!')
-            subprocess.run(['i2cdetect', '-y', '1'])
+            subprocess.call(['i2cdetect', '-y', '1'], stdout=open(os.devnull, "w"))
             flag=1
         
         # Airspeed Calculation
@@ -535,7 +535,7 @@ if (mode>0):
             exit_sequence(1)
             sys.exit('Error creating log file!')
     else:
-        pass
+        print('** Flight log setup excepted **')
             
     if mode==2 or mode==3:
         print('Processing maneuver file.')
