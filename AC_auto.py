@@ -48,6 +48,7 @@
 '''
 
 from multiprocessing import Process, Array, Value
+import subprocess
 import time
 import sys
 import os
@@ -257,28 +258,33 @@ def ARSP_ALT_process(processEXIT,output_array):
 
     while processEXIT.value==0:
         t1=time.time()
-        # Read total pressure for airspeed
+        # Read from the sensors using a try/except loop since a random IOerror occasionally pops up and will prevent all subsequent reads 
         try:
+            # Read total pressure for airspeed
             pt.readPressure_raw()
             pt_press=pt.convertPressure(1,5)*5.2023300231 #inH2O to PSF
+
+            # Read static pressure for altitude
+            ps.read_pressure_temperature()
+            ps_temp=ps.getTemperature_degF()
+            ps_press=ps.getPressure_mbar()
+            flag=0
+        # If an IOerror (or any other error) occurs, reset the I2C bus by calling the i2cdetect ... this appears to be workaround from many forums
         except:
-            # Use the pressure from the last loop
-            print('Total pressure read error!')
+            print('Error reading from I2C!')
+            subprocess.run(['i2cdetect', '-y', '1'])
+            flag=1
+        
+        # Airspeed Calculation
+        # Indicated airspeed (rho=0.0023769 slug/ft^3)
         # Only calculate velocity if the total pressure is greater than the offset, ie. it's positve so the sqrt function doesn't freak out
         if pt_press>output_array[2]:
             output_array[0]=(math.sqrt((pt_press-output_array[2])*841.4321175)) #Indicated velocity in ft/s (841.43=2/0.0023769)
         else:
             output_array[0]=0
-        
-        # Read static pressure for altitude
-        try:
-            ps.read_pressure_temperature()
-            ps_temp=ps.getTemperature_degF()
-            ps_press=ps.getPressure_mbar()
-        except:
-            # Use the pressure from the last loop
-            print('Static pressure read error!')
-        # Altitude calculation based on standard atmosphere equation
+
+        # Altitude Calculation
+        # Based on standard atmosphere equation
         output_array[1]=(1.4536645e5-38951.51955*(ps_press)**0.190284) #Pressure altitude in ft
         output_array[8]=ps_temp
         
@@ -290,7 +296,7 @@ def ARSP_ALT_process(processEXIT,output_array):
         output_array[4],output_array[6]=V_TF.track(output_array[0],dt)
     
         # Find the average total and static pressure during the first INIT_SAMP samples to use as the transducer offsets
-        if COUNT<(INIT_SAMP):
+        if (COUNT<(INIT_SAMP) and flag==0):
             output_array[2]=output_array[2]+pt_press/INIT_SAMP #Average total pressure offset
             output_array[3]=output_array[3]+ps_press/INIT_SAMP #Average static pressure offset
             COUNT=COUNT+1
