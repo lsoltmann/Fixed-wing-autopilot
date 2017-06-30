@@ -87,7 +87,7 @@ class read_maneuver_file:
                      try:
                         self.DEF_TYPE=[int(s) for s in line.split()]
                         self.DEF_TYPE=self.DEF_TYPE[0]
-                        if self.DEF_TYPE!=1 and self.DEF_TYPE!=2:
+                        if self.DEF_TYPE!=1 and self.DEF_TYPE!=2 and self.DEF_TYPE!=3:
                             print('Invalid input for maneuver DEF_TYPE!')
                             self.error_flag=1
                         self.flag=0

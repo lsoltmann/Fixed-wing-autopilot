@@ -321,13 +321,13 @@ def check_CLI_inputs():
         
         elif sys.argv[1]=='2':
             if len(sys.argv)<3:
-                sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
+                sys.exit('Open loop maneuver file not given! Enter maneuver file after mode value.')
             mode=2
             print('Entering MODE 2: preprogrammed open loop maneuver')
         
         elif sys.argv[1]=='3':
             if len(sys.argv)<3:
-                sys.exit('Maneuver file not given! Enter maneuver file after mode value.')
+                sys.exit('Closed loop maneuver file not given! Enter maneuver file after mode value.')
             mode=3
             print('Entering MODE 3: preprogrammed closed loop maneuver')
         
@@ -360,19 +360,19 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
     #If mode=3 (preprogrammed maneuver) set some variables
     if mode==3:
         #Set the initial conditions equal to the aircraft states at activation
-        if PM.ic_type==1:
+        if PM.IC_TYPE==1:
             phi_cmd=AHRS_data[0] #roll
             theta_cmd=AHRS_data[1] #pitch
             psi_cmd=AHRS_data[2] #heading, not used ... just for reference
             #V_cmd=V #velocity
             #alt_cmd=h #altitude
-        elif (PM.ic_type==3 or PM.ic_type==4):
+        elif (PM.IC_TYPE==3 or PM.IC_TYPE==4):
             phi_cmd=PM.man_phi[0] #roll
             theta_cmd=PM.man_theta[0] #pitch
             psi_cmd=AHRS_data[2] #heading , not used ... just for reference
-            if PM.ic_type==3:
+            if PM.IC_TYPE==3:
                 V_cmd=PM.man_vel[0]
-            elif PM.ic_type==4:
+            elif PM.IC_TYPE==4:
                 d_T_cmd=PM.man_thr[0]
 
     #If mode=1,2 save the current aircraft states
@@ -579,20 +579,26 @@ if (mode>0):
                 if mode==1:
                     # Nothing to do if in pass through mode
                     pass
-                
+
+                # PREPROGRAMMED MANEUVER MODE - OPEN LOOP
                 elif mode==2:
                     # Set flags for stepping through maneuver
                     man_flag=1
                     maneuver_count=0
                     t_man_start=time.time()
-                    # Get current control surface commands which will be held constant until maneuver starts
+                    # Get current control surface commands which will be held constant until maneuver starts, for DEF_TYPE=2
                     d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs()
-                    # Convert control surface commands to angles
+                    # Convert control surface commands to angles, for DEF_TYPE=2
                     d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
                     d_a_at_auto=d_a_cmd
                     d_e_at_auto=d_e_cmd
                     d_r_at_auto=d_r_cmd
-                    
+                    # Set maneuver commands equal to zero - only affects DEF_TYPE=3
+                    d_e_man=0
+                    d_a_man=0
+                    d_r_man=0
+
+                # PREPROGRAMMED MANEUVER MODE - CLOSED LOOP    
                 elif mode==3:
                     #Initialize variables
                     count_at_steady_state_pitch=0
@@ -631,28 +637,47 @@ if (mode>0):
             
             # PREPROGRAMMED MANEUVER MODE - OPEN LOOP
             elif mode==2:
+                # For DEF_TYPE=3, get the pilot commands that the maneuver will be superimposed on to
+                if PM.DEF_TYPE==3:
+                    d_a_pwm,d_e_pwm,d_T_pwm,d_r_pwm=get_current_RCinputs() #Get RC inputs
+                    d_a_pilot,d_e_pilot,d_r_pilot,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm)#Conver RC inputs to deg
+                else:
+                    pass
                 t_current=time.time()
-                if (t_current-t_man_start)>=PM.man_time[maneuver_count] and man_flag<2:
-                    # If the current time is equal to (or just barely greater than) the maneuver time, change the target values
-                    if PM.def_type==1: #Absolute deflection
-                        d_e_cmd=PM.man_elev[maneuver_count] #elevator deflection
-                        d_a_cmd=PM.man_ail[maneuver_count] #aileron deflection
-                        d_r_cmd=PM.man_rudd[maneuver_count] #rudder deflection
+                if (t_current-t_man_start)>=PM.MANEUVER_ARRAY[maneuver_count,0] and man_flag<2:
+                    # If the current time is equal to (or just barely greater than) the maneuver time, change the input commands
+                    if PM.DEF_TYPE==1: #Absolute deflection
+                        d_e_cmd=PM.MANEUVER_ARRAY[maneuver_count,1] #elevator deflection
+                        d_a_cmd=PM.MANEUVER_ARRAY[maneuver_count,2] #aileron deflection
+                        d_r_cmd=PM.MANEUVER_ARRAY[maneuver_count,3] #rudder deflection
                         d_T_cmd=0 #throttle command set to current setting
-                    if PM.def_type==2: #Relative deflection (maneuver+command at AP activation)
-                        d_e_cmd=PM.man_elev[maneuver_count]+d_e_at_auto #elevator deflection
-                        d_a_cmd=PM.man_ail[maneuver_count]+d_a_at_auto #aileron deflection
-                        d_r_cmd=PM.man_rudd[maneuver_count]+d_r_at_auto #rudder deflection
+                    elif PM.DEF_TYPE==2: #Relative deflection (maneuver+command at AP activation)
+                        d_e_cmd=PM.MANEUVER_ARRAY[maneuver_count,1]+d_e_at_auto #elevator deflection
+                        d_a_cmd=PM.MANEUVER_ARRAY[maneuver_count,2]+d_a_at_auto #aileron deflection
+                        d_r_cmd=PM.MANEUVER_ARRAY[maneuver_count,3]+d_r_at_auto #rudder deflection
+                        d_T_cmd=0 #throttle command set to current setting
+                    elif PM.DEF_TYPE==3: #Superimposed deflection (maneuver+pilot at AP activation)
+                        d_e_man=PM.MANEUVER_ARRAY[maneuver_count,1] #elevator deflection
+                        d_a_man=PM.MANEUVER_ARRAY[maneuver_count,2] #aileron deflection
+                        d_r_man=PM.MANEUVER_ARRAY[maneuver_count,3] #rudder deflection
                         d_T_cmd=0 #throttle command set to current setting
                     # Increment count to set next maneuver time
                     maneuver_count+=1
-                    if maneuver_count>=len(PM.man_time):
+                    # If the count exceeds the number of time increments in the manevuer, set the flags to end the maneuver
+                    if maneuver_count>=len(PM.MANEUVER_ARRAY[:,0]):
                         man_flag=2
                         maneuver_count=0
+                        # Set maneuver commands equal to zero just incase maneuver did not end near trim deflection  - only affects DEF_TYPE=3
+                        d_e_man=0
+                        d_a_man=0
+                        d_r_man=0
                 else:
-                    # After maneuver is complete, just hold the last command for each control surface
+                    # After maneuver is complete, just hold the last command for each control surface unless in superimposed mode
                     pass
-                
+                if PM.DEF_TYPE==3:
+                    d_e_cmd=d_e_man+d_e_pilot
+                    d_a_cmd=d_a_man+d_a_pilot
+                    d_r_cmd=d_r_man+d_r_pilot
                 # Convert the commanded control surface angles to PWM
                 d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd)
                 d_T_pwm=float(rcin.read(0)) ##Throttle hard coded to manual
@@ -671,7 +696,7 @@ if (mode>0):
                             #If the current time is equal to (or just barely greater than) the maneuver time, change the target values
                             phi_cmd=PM.man_phi[maneuver_count] #roll
                             theta_cmd=PM.man_theta[maneuver_count] #pitch
-                            if PM.ic_type==3:
+                            if PM.IC_TYPE==3:
                                 V_cmd=PM.man_vel[maneuver_count] #velocity
                             #Increment count to set next maneuver time
                             maneuver_count+=1
@@ -699,7 +724,7 @@ if (mode>0):
                         steady_state_condition_achieved_roll=1
                     
                     #Check to make sure velocity is within +/- 'steady_state_vel_range' for a certain amount of time before starting maneuver
-                    if PM.ic_type==3:
+                    if PM.IC_TYPE==3:
                         if abs(ARSP_ALT_data[0]-V_cmd)<steady_state_vel_range and count_at_steady_state_vel<(steady_state_time/loop_dt):
                             count_at_steady_state_vel+=1
                         elif abs(ARSP_ALT_data[0]-V_cmd)>steady_state_vel_range:
@@ -707,7 +732,7 @@ if (mode>0):
                         else:
                             steady_state_condition_achieved_vel=1
                     #Auto set flag when throttle is set as the initial condition
-                    elif PM.ic_type==4:
+                    elif PM.IC_TYPE==4:
                         steady_state_condition_achieved_vel=1
         
                 #MidLevel.controllers(psi_cmd,AHRS_data[0],alt_cmd,h_meas,V_cmd,V_meas)
@@ -715,7 +740,7 @@ if (mode>0):
                 d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd)
                 d_T_pwm=float(rcin.read(0)) ##Throttle hard coded to manual
         
-        # Send servo commands to RCoutput --- CHECK THIS MAPPING
+        # Send servo commands to RCoutput
         rcou1.set_duty_cycle(d_T_pwm*0.001) # u_sec to m_sec
         rcou2.set_duty_cycle(d_a_pwm*0.001)
         rcou3.set_duty_cycle(d_e_pwm*0.001)
