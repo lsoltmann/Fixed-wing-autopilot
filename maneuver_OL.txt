@@ -1,18 +1,25 @@
-#Preprogrammed maneuver file for open loop maneuvers
-#
-#General format for file is:
-#'Variable'
-#<value value value>
+# Preprogrammed maneuver file for open loop maneuvers
 
-#Deflection type
-#1=absolute - deflection values used as is
-#2=relative - deflection values added to commanded values at autopilot activation
-#3=superimposed - deflection values superimposed ontop on current pilot input
+# DEFLECTION TYPE
+# 1=absolute - Deflection values used as is.
+# 2=relative - Deflection values added to the last commanded values when
+#              the autopilot was activated.
+# 3=superimposed - Pilot retains manual control, but the deflection values 
+#                  are superimposed on top on current input. 
+
 DEF_TYPE
 2
 
-#Time(sec) Elev(deg) Ail(deg) Rud(deg)
-TIME DE DA DR
+# CONTROL INPUTS
+# For open loop maneuvers, the control inputs will be given in MxN format where
+# M is the number of points in time for which an input is specified and N is the
+# number of different independent inputs. After all inputs have been specified,
+# the word 'END' is placed on the following line to signal the end of input
+# sequence. The columns labeled as follows:
+#
+#    Time(sec) Elevator(deg) Aileron(deg) Rudder(deg)
+
+CONTROL_INPUTS
 1 -5 0 0
 2 5 0 0
 3 0 0 0
@@ -22,3 +29,4 @@ TIME DE DA DR
 7 0 0 -5
 8 0 0 5
 9 0 0 0
+END
