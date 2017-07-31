@@ -54,6 +54,7 @@ import sys
 import os
 import math
 import RPi.GPIO as GPIO
+import serial
 
 #sys.path.append('/home/pi/AirLink')
 sys.path.append('/home/pi/Python3_AP_Library')
@@ -87,6 +88,7 @@ FLTLOG=0
 
 ## VARIABLE DEFINITIONS ##
 ORIENTATION=5
+PULSE_DIV=2 # Jumper setting on the RPM counter board
 
 # Hard iron offsets measured on 27May2017 on Firstar V2
 hix=-18.117 #Hard iron offset, x (from calibration)
@@ -141,15 +143,13 @@ def AHRS_process(processEXIT,output_array):
     time.sleep(1)
     g_offset=[0,0,0]
     
-    '''
     # Low pass filter setup
-    fc=15; #Hz
-    dt_f=0.0011 #measured average (sec)
-    pie=3.14159265
-    a_f=2*pie*dt_f*fc/(2*pie*dt_f*fc+1)
-    b_f=1-a_f
-    first_time=1
-    '''
+    #fc=15; #Hz
+    #dt_f=0.0011 #measured average (sec)
+    #pie=3.14159265
+    #a_f=2*pie*dt_f*fc/(2*pie*dt_f*fc+1)
+    #b_f=1-a_f
+    #first_time=1
     
     # Loop to determine gyroscope offsets
     for x in range(0, 100):
@@ -180,18 +180,16 @@ def AHRS_process(processEXIT,output_array):
             az=m9a[2]*0.10197
         att.attitude3(ax,ay,az,gx,gy,gz,m9m[0],m9m[1],m9m[2])
         
-        '''
         # Apply LPF (only for ouput data)
-        if first_time==1:
-            theta_dot_d=att.thetad_d
-            phi_dot_d=att.phid_d
-            psi_dot_d=att.psid_d
-            first_time=0
-        else:
-            theta_dot_d=a_f*att.thetad_d+b_f*theta_dot_d
-            phi_dot_d=a_f*att.phid_d+b_f*phi_dot_d
-            psi_dot_d=a_f*att.psid_d+b_f*psi_dot_d
-        '''
+        #if first_time==1:
+        #    theta_dot_d=att.thetad_d
+        #    phi_dot_d=att.phid_d
+        #    psi_dot_d=att.psid_d
+        #    first_time=0
+        #else:
+        #    theta_dot_d=a_f*att.thetad_d+b_f*theta_dot_d
+        #    phi_dot_d=a_f*att.phid_d+b_f*phi_dot_d
+        #    psi_dot_d=a_f*att.psid_d+b_f*psi_dot_d
         
         # Set outputs
         output_array[0]=att.roll_d-output_array[10]  #Subtract offsets due to orientation error
@@ -304,6 +302,26 @@ def ARSP_ALT_process(processEXIT,output_array):
     # Clean up the GPIO before ending the process
     GPIO.cleanup()
     print('Airspeed/altitude process stopped.')
+
+
+# Subprocess for RPM reading
+def RPM_process(processEXIT,output_array):
+    # output_array[0]=RPM
+
+    print('Starting RPM process.')
+    MCU = serial.Serial('/dev/ttyAMA0',baudrate=115200,bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE,stopbits=serial.STOPBITS_ONE)
+    RPM_PW=0 # Initialize value so loop doesn't error if pulse width wasn't read during the first round
+
+    while processEXIT.value==0:
+        MCU.write(b'A')
+        RPM_BITS=MCU.read(4)
+        RPM_PW=int.from_bytes(RPM_BITS, byteorder='big')
+        if RPM_PW<1:
+            output_array[0]=0
+        else:
+            output_array[0]=int((PULSE_DIV*1e6/(RPM_PW))*60)
+        time.sleep(0.01)
+    print('RPM process stopped.')
 
 def check_CLI_inputs():
     #Modes:
@@ -488,21 +506,24 @@ if (mode>0):
     set_ext_LED('Yellow')
     
     ## Subprocesses
-    # Subprocess array for AHRS and pressure transducer data
+    # Subprocess data arrays
     AHRS_data=Array('d', [0.0,0.0,0.0,0.0,0.0,0.0,hix,hiy,hiz,0.0,phi_offset,theta_offset,0.0,0.0,0.0,0.0,0.0,0.0,ORIENTATION])
     ARSP_ALT_data=Array('d',[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
-    
+    RPM_data=Array('i',[0])
+
     # Subprocess value that sets exit flag
     process_EXIT=Value('i', 0)
     
     # Define the subprocesses
     AHRS_proc=Process(target=AHRS_process, args=(process_EXIT,AHRS_data))
     ARSP_ALT_proc=Process(target=ARSP_ALT_process, args=(process_EXIT,ARSP_ALT_data))
-    
+    RPM_proc=Process(target=RPM_process, args=(process_EXIT,RPM_data))
+
     # Start the subprocesses
     AHRS_proc.start()
     ARSP_ALT_proc.start()
-    
+    RPM_proc.start()    
+
     # Initialize controllers
     CsCal=ControlSurface_Calibration.CS_cal()
     LowLevel=Control_LowLevel.LL_controls()
@@ -529,8 +550,8 @@ if (mode>0):
             flt_log.write('# PSF mbar\n')
             flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
             flt_log.write('\n')
-            flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD AV_BAY_TEMP\n')
-            flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg degF\n')
+            flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD AV_BAY_TEMP RPM\n')
+            flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg degF RPM\n')
         except:
             exit_sequence(1)
             sys.exit('Error creating log file!')
@@ -768,7 +789,7 @@ if (mode>0):
         if FLTLOG==1:
             if gear_switch>1500:       
                 #              T    DT   PHI THETA PSI  PHID THtD PSID  P    Q    R   AX   AY   AZ   IAS  ALT  IASF ALTF VACF VSIF E  A  T  R  EC   AC   TC RC   DEGF
-                flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f %.1f\n' % (t_elapsed,
+                flt_log.write('%.3f %.4f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.3f %.3f %.3f %.1f %.0f %.1f %.0f %.1f %.0f %d %d %d %d %.1f %.1f %d %.1f %.1f %d\n' % (t_elapsed,
                                                                                                          dt3,
                                                                                                          AHRS_data[0],
                                                                                                          AHRS_data[1],
@@ -796,7 +817,8 @@ if (mode>0):
                                                                                                          d_a_cmd,
                                                                                                          d_T_cmd,
                                                                                                          d_r_cmd,
-                                                                                                         ARSP_ALT_data[8]))
+                                                                                                         ARSP_ALT_data[8],
+                                                                                                         RPM_data[0]))
         else:
             pass
         
