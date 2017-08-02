@@ -84,7 +84,7 @@ tgear=0
 gearflag=0
 
 # Create flight log (1) or not (0)
-FLTLOG=0
+FLTLOG=1
 
 ## VARIABLE DEFINITIONS ##
 ORIENTATION=5
@@ -323,6 +323,7 @@ def RPM_process(processEXIT,output_array):
         time.sleep(0.01)
     print('RPM process stopped.')
 
+
 def check_CLI_inputs():
     #Modes:
     # 1 = Pass through
@@ -551,7 +552,7 @@ if (mode>0):
             flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
             flt_log.write('\n')
             flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD AV_BAY_TEMP RPM\n')
-            flt_log.write('# sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg degF RPM\n')
+            flt_log.write('#UNITS sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg degF RPM\n')
         except:
             exit_sequence(1)
             sys.exit('Error creating log file!')
