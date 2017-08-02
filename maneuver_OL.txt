@@ -8,7 +8,7 @@
 #                  are superimposed on top on current input. 
 
 DEF_TYPE
-1
+3
 
 # CONTROL INPUTS
 # For open loop maneuvers, the control inputs will be given in MxN format where
