@@ -361,6 +361,10 @@ def check_CLI_inputs():
                 sys.exit('** Not enough inputs! **')
             mode=-1
             print('Entering control mapping calibration mode.')
+
+        elif sys.argv[1]=='-2':
+            mode=-2
+            print('Entering control surface calibratio mode.')
         
         else:
             exit_sequence(1)
@@ -844,7 +848,7 @@ if (mode>0):
         #print(ARSP_ALT_data[1])
         
 # ---------- Calibration Modes ---------- #
-# CONTROL CALIBRATION MODE
+# CONTROL MAPPING CALIBRATION MODE
 # in this mode the PWM to pitch/roll/yaw curves are determined based on the user input file
 elif mode==-1:
     led.setColor('Black')
@@ -1024,6 +1028,67 @@ elif mode==-1:
     print(' ')
     print('Done.')
 
+
+
+# CONTROL SURFACE CALIBRATION MODE
+# In this mode the PWM is mapped to control surface deflection using the Memsic2125 dual axis accelerometer
+# The PWM is set by the user and then the user enters the correspondig accelerometer duty cycle values
+elif mode==-2:
+    led.setColor('Black') 
+    
+    # Setup PWM outputs for controls
+    rcou1=pwm.PWM(0)
+    rcou2=pwm.PWM(1)
+    rcou3=pwm.PWM(2)
+    rcou4=pwm.PWM(3)
+    # Setup PWM frequencies
+    rcou1.set_period(50) #Hz
+    rcou2.set_period(50)
+    rcou3.set_period(50)
+    rcou4.set_period(50)
+    # Set initial commands
+    rcou1.set_duty_cycle(1091*0.001) # u_sec to m_sec
+    rcou2.set_duty_cycle(1500*0.001)
+    rcou3.set_duty_cycle(1500*0.001)
+    rcou4.set_duty_cycle(1500*0.001)
+
+    # Set output file
+    log_timestr = time.strftime("%d%m%Y-%H%M")
+    log_timestr2= time.asctime()
+    cal_log=open('surface_calibration_log_'+log_timestr+'.txt', 'w')
+    cal_log.write('# '+log_timestr2+' local time')
+    cal_log.write('\n\n')
+    cal_log.write('#LABELS CHANNEL PWM AX AY\n')
+    cal_log.write('#UNITS N/A usec DC DC\n') #DC=Duty cycle - on/off
+
+    # Main calibration loop
+    print('To exit the calibration enter 0 for the PWM value on any channel.\n')
+    exit_cal=0
+    while exit_cal==0:
+        CHN,PWM_CMD=input('Enter channel number <space> PWM(u_sec): ').split()
+        CHN=int(CHN)
+        PWM_CMD=int(PWM_CMD)
+        if PWM_CMD==0:
+            exit_cal=1
+        elif CHN==1:
+            print('Throttle channel not allowed to be changed!\n')
+        elif (CHN != 2 and CHN != 3 and CHN != 4):
+            print('Channel value out of range! Must be either 2,3,4.\n')
+        else:
+            if CHN==2:
+                rcou2.set_duty_cycle(PWM_CMD*0.001)
+            elif CHN==3:
+                rcou3.set_duty_cycle(PWM_CMD*0.001)
+            elif CHN==4:
+                rcou4.set_duty_cycle(PWM_CMD*0.001)
+            AX,AY=input('Enter accelerometer duty cycle values, AX <space> AY: ').split()
+            AX=float(AX)
+            AY=float(AY)
+            cal_log.write('%d %d %.1f %.1f\n' % (CHN,PWM_CMD,AX,AY))
+    cal_log.close()
+    print('Control surface calibration ended and file written.')
+    print(' ')
+    print('Done.')  
 # ---------- Exit Sequence ---------- #
 if (mode>0):
     exit_sequence(0)
