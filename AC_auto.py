@@ -474,6 +474,43 @@ def set_ext_LED(color):
     else:
         pass
 
+# Subprocess for control surface calibration
+def CS_CAL_PWM_process(processEXIT,output_array):
+    # output_array[0]=PWM_CH2
+    # output_array[1]=PWM_CH3
+    # output_array[2]=PWM_CH4
+
+    print('Starting CS CAL PWM process.')
+
+    # Setup PWM outputs for controls
+    rcou1=pwm.PWM(0)
+    rcou2=pwm.PWM(1)
+    rcou3=pwm.PWM(2)
+    rcou4=pwm.PWM(3)
+    # Setup PWM frequencies
+    rcou1.set_period(50) #Hz
+    rcou2.set_period(50)
+    rcou3.set_period(50)
+    rcou4.set_period(50)
+    # Set initial commands
+    rcou1.set_duty_cycle(1091*0.001) # u_sec to m_sec
+    rcou2.set_duty_cycle(1500*0.001)
+    rcou3.set_duty_cycle(1500*0.001)
+    rcou4.set_duty_cycle(1500*0.001)
+
+    while processEXIT.value==0:
+        rcou1.set_duty_cycle(1091*0.001)
+        rcou2.set_duty_cycle(output_array[0]*0.001)
+        rcou3.set_duty_cycle(output_array[1]*0.001)
+        rcou4.set_duty_cycle(output_array[2]*0.001)
+        time.sleep(0.02)
+    # Set all commands except throttle back to neutral before exiting
+    rcou1.set_duty_cycle(1091*0.001) # u_sec to m_sec
+    rcou2.set_duty_cycle(1500*0.001)
+    rcou3.set_duty_cycle(1500*0.001)
+    rcou4.set_duty_cycle(1500*0.001)
+    print('CS CAL PWM  process stopped.')
+
 ##### MAIN PROGRAM #####
 # Setup LED
 led=leds.Led()
@@ -555,7 +592,7 @@ if (mode>0):
             flt_log.write('# PSF mbar\n')
             flt_log.write('# %.3f %.2f\n' % (ARSP_ALT_data[2],ARSP_ALT_data[3]))
             flt_log.write('\n')
-            flt_log.write('T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD AV_BAY_TEMP RPM\n')
+            flt_log.write('#LABELS T DT PHI THETA PSI PHI_DOT THETA_DOT PSI_DOT P Q R AX AY AZ VIAS ALT VIAS_F ALT_F VACC_F VSI_F ELEV AIL THR RUDD ELEV_CMD AIL_CMD THR_CMD RUDD_CMD AV_BAY_TEMP RPM\n')
             flt_log.write('#UNITS sec sec deg deg deg deg/s deg/s deg/s deg/s deg/s deg/s g g g ft/s ft ft/s ft ft/s^2 ft/s PWM PWM PWM PWM deg deg % deg degF RPM\n')
         except:
             exit_sequence(1)
@@ -1036,21 +1073,17 @@ elif mode==-1:
 elif mode==-2:
     led.setColor('Black') 
     
-    # Setup PWM outputs for controls
-    rcou1=pwm.PWM(0)
-    rcou2=pwm.PWM(1)
-    rcou3=pwm.PWM(2)
-    rcou4=pwm.PWM(3)
-    # Setup PWM frequencies
-    rcou1.set_period(50) #Hz
-    rcou2.set_period(50)
-    rcou3.set_period(50)
-    rcou4.set_period(50)
-    # Set initial commands
-    rcou1.set_duty_cycle(1091*0.001) # u_sec to m_sec
-    rcou2.set_duty_cycle(1500*0.001)
-    rcou3.set_duty_cycle(1500*0.001)
-    rcou4.set_duty_cycle(1500*0.001)
+    # Setup subprocess data array
+    PWM_data=Array('i',[0,0,0])
+
+    # Subprocess value that sets exit flag
+    process_EXIT=Value('i', 0)
+
+    # Define the subprocesses
+    CS_CAL_PWM_proc=Process(target=CS_CAL_PWM_process, args=(process_EXIT,PWM_data))
+
+    # Start the subprocesses
+    CS_CAL_PWM_proc.start()
 
     # Set output file
     log_timestr = time.strftime("%d%m%Y-%H%M")
@@ -1058,8 +1091,10 @@ elif mode==-2:
     cal_log=open('surface_calibration_log_'+log_timestr+'.txt', 'w')
     cal_log.write('# '+log_timestr2+' local time')
     cal_log.write('\n\n')
+    cal_log.write('# CONTROL SURFACE CALIBRATION LOG')
+    cal_log.write('\n\n')
     cal_log.write('#LABELS CHANNEL PWM AX AY\n')
-    cal_log.write('#UNITS N/A usec DC DC\n') #DC=Duty cycle - on/off
+    cal_log.write('#UNITS num usec DC DC\n') #DC=Duty cycle - on/off
 
     # Main calibration loop
     print('To exit the calibration enter 0 for the PWM value on any channel.\n')
@@ -1076,19 +1111,28 @@ elif mode==-2:
             print('Channel value out of range! Must be either 2,3,4.\n')
         else:
             if CHN==2:
-                rcou2.set_duty_cycle(PWM_CMD*0.001)
+                PWM_data[0]=PWM_CMD
+                PWM_data[1]=1500
+                PWM_data[2]=1500
             elif CHN==3:
-                rcou3.set_duty_cycle(PWM_CMD*0.001)
+                PWM_data[0]=1500
+                PWM_data[1]=PWM_CMD   
+                PWM_data[2]=1500 
             elif CHN==4:
-                rcou4.set_duty_cycle(PWM_CMD*0.001)
+                PWM_data[0]=1500
+                PWM_data[1]=1500   
+                PWM_data[2]=PWM_CMD 
             AX,AY=input('Enter accelerometer duty cycle values, AX <space> AY: ').split()
             AX=float(AX)
             AY=float(AY)
             cal_log.write('%d %d %.1f %.1f\n' % (CHN,PWM_CMD,AX,AY))
     cal_log.close()
+    process_EXIT.value=1
+    CS_CAL_PWM_proc.join()
     print('Control surface calibration ended and file written.')
     print(' ')
     print('Done.')  
+
 # ---------- Exit Sequence ---------- #
 if (mode>0):
     exit_sequence(0)
