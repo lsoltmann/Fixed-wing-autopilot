@@ -572,7 +572,12 @@ if (mode>0):
     MidLevel=Control_MidLevel.ML_controls()
     
     # Wait for all subprocesses to startup and get through initialization
-    time.sleep(3)
+    t_start_init=time.time()
+    t_stop=0
+    while t_stop<3:
+        set_ext_LED('Yellow')
+        t_stop=time.time()-t_start_init
+        time.sleep(0.01)
     
     # Check to make sure magnetometer is functioning correctly and not reporting all zeros
     if AHRS_data[9]==1.0:
@@ -1084,6 +1089,7 @@ elif mode==-2:
 
     # Start the subprocesses
     CS_CAL_PWM_proc.start()
+    time.sleep(3)
 
     # Set output file
     log_timestr = time.strftime("%d%m%Y-%H%M")
@@ -1099,33 +1105,44 @@ elif mode==-2:
     # Main calibration loop
     print('To exit the calibration enter 0 for the PWM value on any channel.\n')
     exit_cal=0
+    input1_error=0
     while exit_cal==0:
-        CHN,PWM_CMD=input('Enter channel number <space> PWM(u_sec): ').split()
-        CHN=int(CHN)
-        PWM_CMD=int(PWM_CMD)
-        if PWM_CMD==0:
-            exit_cal=1
-        elif CHN==1:
-            print('Throttle channel not allowed to be changed!\n')
-        elif (CHN != 2 and CHN != 3 and CHN != 4):
-            print('Channel value out of range! Must be either 2,3,4.\n')
+        try:
+            CHN,PWM_CMD=input('Enter channel number <space> PWM(u_sec): ').split()
+            CHN=int(CHN)
+            PWM_CMD=int(PWM_CMD)
+            if PWM_CMD==0:
+                exit_cal=1
+            elif CHN==1:
+                print('Throttle channel not allowed to be changed!\n')
+            elif (CHN != 2 and CHN != 3 and CHN != 4):
+                print('Channel value out of range! Must be either 2,3,4.\n')
+            else:
+                if CHN==2:
+                    PWM_data[0]=PWM_CMD
+                    PWM_data[1]=1500
+                    PWM_data[2]=1500
+                elif CHN==3:
+                    PWM_data[0]=1500
+                    PWM_data[1]=PWM_CMD   
+                    PWM_data[2]=1500 
+                elif CHN==4:
+                    PWM_data[0]=1500
+                    PWM_data[1]=1500   
+                    PWM_data[2]=PWM_CMD
+        except:
+            print('Error entering channel/PWM value!\n')
+            input1_error=1
+        if input1_error==0 and exit_cal==0:
+            try: 
+                AX,AY=input('Enter accelerometer duty cycle values, AX <space> AY: ').split()
+                AX=float(AX)
+                AY=float(AY)
+                cal_log.write('%d %d %.1f %.1f\n' % (CHN,PWM_CMD,AX,AY))
+            except:
+                print('Error entering accelerometer values!\n')
         else:
-            if CHN==2:
-                PWM_data[0]=PWM_CMD
-                PWM_data[1]=1500
-                PWM_data[2]=1500
-            elif CHN==3:
-                PWM_data[0]=1500
-                PWM_data[1]=PWM_CMD   
-                PWM_data[2]=1500 
-            elif CHN==4:
-                PWM_data[0]=1500
-                PWM_data[1]=1500   
-                PWM_data[2]=PWM_CMD 
-            AX,AY=input('Enter accelerometer duty cycle values, AX <space> AY: ').split()
-            AX=float(AX)
-            AY=float(AY)
-            cal_log.write('%d %d %.1f %.1f\n' % (CHN,PWM_CMD,AX,AY))
+            input1_error=0
     cal_log.close()
     process_EXIT.value=1
     CS_CAL_PWM_proc.join()
