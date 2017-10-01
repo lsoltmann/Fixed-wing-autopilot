@@ -38,30 +38,30 @@ class CS_cal:
         # intercept=center
         
         #Zero position PWM (u_sec) of each control surface
-        self.da_center=1500
-        self.de_center=1500
-        self.dr_center=1500
+        self.da_center=1504
+        self.de_center=1488
+        self.dr_center=1523
         self.dT_off=900
     
         #Slope of calibration function
-        self.da_slope=(2100-900)/(20+20)
-        self.de_slope=(2100-900)/(20+20)
-        self.dr_slope=(2100-900)/(20+20)
+        self.da_slope=-23.328
+        self.de_slope=17.316
+        self.dr_slope=-19.786
         self.dT_slope=(2100-900)/(100)
 
     def delta_to_pwm(self,d_a,d_e,d_r,d_T):
         ##Apply control surface calibrations
         #Aileron
-        d_a_pwm=self.da_slope*d_a+self.da_center
+        d_a_pwm=round(self.da_slope*d_a+self.da_center)
         
         #Elevator
-        d_e_pwm=self.de_slope*d_e+self.de_center
+        d_e_pwm=round(self.de_slope*d_e+self.de_center)
         
         #Rudder
-        d_r_pwm=self.dr_slope*d_r+self.dr_center
+        d_r_pwm=round(self.dr_slope*d_r+self.dr_center)
         
         #Throttle
-        d_T_pwm=self.dT_slope*d_T+self.dT_off
+        d_T_pwm=round(self.dT_slope*d_T+self.dT_off)
         
         return d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm
 
