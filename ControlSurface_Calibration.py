@@ -46,7 +46,7 @@ class CS_cal:
         #Slope of calibration function
         self.da_slope=-23.328
         self.de_slope=17.316
-        self.dr_slope=-19.786
+        self.dr_slope=19.786
         self.dT_slope=(2100-900)/(100)
 
     def delta_to_pwm(self,d_a,d_e,d_r,d_T):

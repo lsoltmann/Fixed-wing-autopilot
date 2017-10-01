@@ -84,7 +84,7 @@ tgear=0
 gearflag=0
 
 # Create flight log (1) or not (0)
-FLTLOG=1
+FLTLOG=0
 
 ## VARIABLE DEFINITIONS ##
 ORIENTATION=5
@@ -387,8 +387,8 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
             phi_cmd=AHRS_data[0] #roll
             theta_cmd=AHRS_data[1] #pitch
             psi_cmd=AHRS_data[2] #heading, not used ... just for reference
-            #V_cmd=V #velocity
-            #alt_cmd=h #altitude
+            V_cmd=ARSP_ALT_data[4] #velocity
+            alt_cmd=ARSP_ALT_data[5] #altitude
         elif (PM.IC_TYPE==3 or PM.IC_TYPE==4):
             phi_cmd=PM.man_phi[0] #roll
             theta_cmd=PM.man_theta[0] #pitch
@@ -404,7 +404,7 @@ def set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data):
         phi_cmd=AHRS_data[0] #roll
         theta_cmd=AHRS_data[1] #pitch
         psi_cmd=AHRS_data[2] #heading
-        V_cmd=ARSP_ALT_data[0]
+        V_cmd=ARSP_ALT_data[4]
     
     return phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd
 
@@ -682,7 +682,7 @@ if (mode>0):
                     # Convert control surface commands to angles
                     d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd=CsCal.pwm_to_delta(d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm) #control surfaces
                     # Set initial commands
-                    phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data[0])
+                    phi_cmd,theta_cmd,psi_cmd,d_T_cmd,V_cmd=set_initial_cmds(PM,AHRS_data,d_T_cmd,ARSP_ALT_data)
 
                     #Seed controllers
                     LowLevel.ail_PID.integral_term=d_a_cmd
@@ -805,6 +805,12 @@ if (mode>0):
         
                 #MidLevel.controllers(psi_cmd,AHRS_data[0],alt_cmd,h_meas,V_cmd,V_meas)
                 d_a_cmd,d_e_cmd,d_r_cmd=LowLevel.controllers(phi_cmd,AHRS_data[0],theta_cmd,AHRS_data[1],AHRS_data[3],0)
+
+                #Test values - commands overriden and set to constant values
+                #d_a_cmd=15
+                #d_e_cmd=15
+                #d_r_cmd=15
+
                 d_a_pwm,d_e_pwm,d_r_pwm,d_T_pwm=CsCal.delta_to_pwm(d_a_cmd,d_e_cmd,d_r_cmd,d_T_cmd)
                 d_T_pwm=float(rcin.read(0)) ##Throttle hard coded to manual
         

@@ -16,7 +16,7 @@ TIME
 
 #Pitch angle (deg)
 THETA
-5 0 -5 0
+30 30 30 30
 
 #Roll angle (deg)
 PHI
@@ -28,7 +28,7 @@ VEL
 
 #Throttle (%)**
 THR
-60 60 60 60
+0 0 0 0
 
 
 
