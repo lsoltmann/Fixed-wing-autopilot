@@ -42,11 +42,11 @@ class LL_controls:
         self.max_rud_def= 20 #deg
         
         ## Initial controller gains
-        self.rudder_gain=0.1
-        elev_kp= 1
+        self.rudder_gain=2
+        elev_kp= -2
         elev_kd= 0
-        elev_ki= 0.1
-        ail_kp=  1
+        elev_ki= -0.1
+        ail_kp=  2
         ail_kd=  0
         ail_ki=  0.1
         self.lift_compensation_gain=0.1
